@@ -81,7 +81,7 @@
             <div class="cart-summary">
                 <h2>Total: <span id="total-geral">R$ {{ "%.2f"|format(total_geral) }}</span></h2>
                 <div class="payment-options">
-                    <a href="{{ url_for('finalizar_compra_pix') }}" class="payment-button">Pagar com PIX</a>
+                    <a href="{{ url_for('finalizar_compra') }}" class="payment-button">Pagar com PIX</a>
                 </div>
             </div>
         {% endif %}

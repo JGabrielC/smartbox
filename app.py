@@ -2,6 +2,9 @@ import os
 import datetime
 import requests
 import uuid
+import qrcode
+from io import BytesIO
+import base64
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from models import db, User, Condominio, Product, Inventory, Sale
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -9,6 +12,7 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import secrets
 from datetime import timedelta
+from sqlalchemy import func
 
 # --- Configuração da Aplicação ---
 app = Flask(__name__)
@@ -23,6 +27,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/profile_pics')
 MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR-2683965692592409-071011-19820758846ee46db59f8bb79039b115-250701524'
 MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-d2bb5f89-dd93-4e13-823d-f75c2fa40e3d'
 MERCADO_PAGO_API_URL = 'https://api.mercadopago.com/v1/payments'
+MERCADO_PAGO_PREFERENCES_URL = 'https://api.mercadopago.com/checkout/preferences'
 
 db.init_app(app)
 
@@ -55,8 +60,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard' if current_user.is_admin else 'user_dashboard'))
     if request.method == 'POST':
-        cpf = request.form.get('cpf')
-        password = request.form.get('password')
+        cpf = request.form.get('cpf'); password = request.form.get('password')
         user = User.query.filter_by(cpf=cpf).first()
         if user and user.check_password(password):
             login_user(user, remember=True)
@@ -99,15 +103,12 @@ def user_dashboard():
         products_in_condo = Inventory.query.filter_by(condominio_id=condo.id).filter(Inventory.quantity > 0).all()
     todos_condominios = Condominio.query.order_by(Condominio.name).all()
     favorite_ids = {fav.id for fav in current_user.favorite_products}
-    return render_template('user_dashboard.html', products_in_condo=products_in_condo, todos_condominios=todos_condominios, favorite_ids=favorite_ids)
+    return render_template('user_dashboard.html', 
+                           products_in_condo=products_in_condo, 
+                           todos_condominios=todos_condominios,
+                           favorite_ids=favorite_ids)
 
 # --- ROTAS DE GESTÃO DO UTILIZADOR ---
-@app.route('/meu_historico')
-@login_required
-def meu_historico():
-    compras = Sale.query.filter_by(user_id=current_user.id, status='paid').order_by(Sale.sale_timestamp.desc()).all()
-    return render_template('meu_historico.html', compras=compras)
-
 @app.route('/meu_perfil', methods=['GET', 'POST'])
 @login_required
 def meu_perfil():
@@ -190,9 +191,9 @@ def remover_do_carrinho():
     session['cart'] = cart
     return redirect(url_for('ver_carrinho'))
 
-@app.route('/finalizar_compra/<string:method>')
+@app.route('/finalizar_compra_pix')
 @login_required
-def finalizar_compra(method):
+def finalizar_compra_pix():
     cart = session.get('cart', {});
     if not cart: return redirect(url_for('user_dashboard'))
     total_amount = 0; description_items = []; order_id = str(uuid.uuid4())
@@ -207,15 +208,6 @@ def finalizar_compra(method):
     db.session.commit()
     total_amount = round(total_amount, 2); description = ", ".join(description_items)
     
-    if method == 'pix':
-        return redirect(url_for('gerar_pix_carrinho', order_id=order_id, total_amount=total_amount, description=description))
-    elif method == 'card':
-        return render_template('credit_card_payment.html', public_key=MERCADO_PAGO_PUBLIC_KEY, total_amount=total_amount, description=description, order_id=order_id)
-
-@app.route('/gerar_pix_carrinho')
-@login_required
-def gerar_pix_carrinho():
-    order_id = request.args.get('order_id'); total_amount = request.args.get('total_amount'); description = request.args.get('description')
     headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
     notification_url = url_for('webhook_mercado_pago', _external=True)
     payload = {"transaction_amount": float(total_amount), "description": description, "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"}, "external_reference": order_id}
@@ -227,40 +219,6 @@ def gerar_pix_carrinho():
         return render_template('payment.html', qr_code=qr_code, qr_code_base64=qr_code_base64, sale_payment_id=sale_payment_id)
     except requests.exceptions.RequestException as e:
         print(f"Erro ao comunicar com o Mercado Pago: {e}"); flash('Não foi possível iniciar o pagamento PIX.', 'error'); return redirect(url_for('ver_carrinho'))
-
-@app.route('/processar_pagamento_cartao', methods=['POST'])
-@login_required
-def processar_pagamento_cartao():
-    token = request.form.get('token'); issuer_id = request.form.get('issuer_id'); payment_method_id = request.form.get('payment_method_id')
-    installments = int(request.form.get('installments')); transaction_amount = float(request.form.get('transaction_amount'))
-    order_id = request.form.get('order_id'); description = request.form.get('description')
-    doc_type = request.form.get('identificationType'); doc_number = request.form.get('form-checkout__identificationNumber')
-    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': str(uuid.uuid4())}
-    payload = {
-        "transaction_amount": transaction_amount, "token": token, "description": description, "installments": installments, 
-        "payment_method_id": payment_method_id, "issuer_id": issuer_id, "external_reference": order_id,
-        "payer": {
-            "email": f"cliente_{current_user.id}@smartbox.com",
-            "identification": { "type": doc_type, "number": doc_number.replace('.', '').replace('-', '') }
-        }
-    }
-    try:
-        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); payment_data = response.json()
-        print("--- RESPOSTA DO MERCADO PAGO ---"); print(payment_data); print("---------------------------------")
-        if response.ok and payment_data.get('status') == 'approved':
-            sale_payment_id = str(payment_data.get('id'))
-            for venda in Sale.query.filter_by(payment_id=order_id).all():
-                venda.status = 'paid'; venda.payment_id = sale_payment_id
-                item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
-                if item: item.quantity -= venda.quantity_sold
-            session.pop('cart', None); db.session.commit()
-            return redirect(url_for('payment_success'))
-        else:
-            error_message = payment_data.get('message', 'Erro desconhecido.'); status_detail = payment_data.get('status_detail', '')
-            flash(f"Pagamento recusado: {error_message} ({status_detail})", 'danger')
-            return redirect(url_for('ver_carrinho'))
-    except requests.exceptions.RequestException as e:
-        flash("Ocorreu um erro de comunicação.", "danger"); return redirect(url_for('ver_carrinho'))
 
 @app.route('/webhook/pix', methods=['POST'])
 def webhook_mercado_pago():
@@ -277,33 +235,85 @@ def webhook_mercado_pago():
                         venda.status = 'paid'; venda.payment_id = payment_id
                         item = Inventory.query.filter_by(condominio_id=venda.condominio_id, product_id=venda.product_id).first()
                         if item: item.quantity -= venda.quantity_sold
-                    db.session.commit()
-                    print(f"PAGAMENTO PIX APROVADO VIA WEBHOOK! Ordem ID: {order_id}.")
+                    db.session.commit(); print(f"PAGAMENTO APROVADO VIA WEBHOOK! Ordem ID: {order_id}.")
     return jsonify({"status": "ok"}), 200
 
+# --- ROTA DE VERIFICAÇÃO DE PAGAMENTO (NOVA LÓGICA) ---
 @app.route('/check_payment_status/<string:sale_payment_id>')
 @login_required
 def check_payment_status(sale_payment_id):
     venda = Sale.query.filter_by(payment_id=sale_payment_id).first()
-    if venda and venda.status == 'paid': session.pop('cart', None)
-    return jsonify({"status": venda.status if venda else "not_found"})
 
-@app.route('/payment_success')
+    # Se a venda ainda estiver pendente, vamos verificar no Mercado Pago
+    if venda and venda.status == 'pending':
+        try:
+            response = requests.get(
+                f'{MERCADO_PAGO_API_URL}/{sale_payment_id}',
+                headers={'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'}
+            )
+            response.raise_for_status()
+            payment_info = response.json()
+
+            # Se o Mercado Pago confirmar que o pagamento foi aprovado
+            if payment_info.get('status') == 'approved':
+                order_id = payment_info.get('external_reference')
+                vendas_da_ordem = Sale.query.filter_by(payment_id=order_id, status='pending').all()
+
+                for v in vendas_da_ordem:
+                    v.status = 'paid'
+                    v.payment_id = sale_payment_id # Atualiza com o ID de pagamento final
+
+                    # --- LINHAS ADICIONADAS PARA DESCONTAR O STOCK ---
+                    item_no_inventario = Inventory.query.filter_by(product_id=v.product_id, condominio_id=v.condominio_id).first()
+                    if item_no_inventario:
+                        item_no_inventario.quantity -= v.quantity_sold
+                    # --- FIM DAS LINHAS ADICIONADAS ---
+
+                db.session.commit()
+                return jsonify({"status": "paid", "order_id": order_id})
+
+        except requests.exceptions.RequestException as e:
+            print(f"Erro ao verificar o estado do pagamento: {e}")
+            return jsonify({"status": "error"})
+
+    # Se a venda já estava paga na nossa base de dados
+    elif venda and venda.status == 'paid':
+        return jsonify({"status": "paid", "order_id": venda.payment_id})
+
+    # Se não encontrou ou ainda está pendente após a verificação
+    return jsonify({"status": "pending"})
+
+@app.route('/pagamento_aprovado/<string:order_id>')
 @login_required
-def payment_success():
-    return render_template('payment_success.html')
+def pagamento_aprovado(order_id):
+    # Gera o QR Code com o order_id para ser lido pela geladeira
+    qr = qrcode.QRCode(version=1, box_size=10, border=5); qr.add_data(order_id); qr.make(fit=True)
+    img = qr.make_image(fill='black', back_color='white'); buffered = BytesIO()
+    img.save(buffered, format="PNG"); img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    qr_code_url = f"data:image/png;base64,{img_str}"
+    session.pop('cart', None) # Limpa o carrinho
+    return render_template('payment_success.html', qr_code_url=qr_code_url)
 
 @app.route('/payment_failed')
 @login_required
 def payment_failed():
     return render_template('payment_failed.html')
 
+# --- ROTA PARA O HARDWARE DA GELADEIRA ---
+@app.route('/api/liberar_geladeira/<string:order_id>')
+def api_liberar_geladeira(order_id):
+    venda = Sale.query.filter_by(payment_id=order_id, status='paid').first()
+    if venda:
+        print(f"Comando recebido: ABRIR GELADEIRA para a ordem {order_id}"); return jsonify({"status": "success", "message": "Porta liberada"}), 200
+    else:
+        print(f"Tentativa de abertura FALHOU para a ordem {order_id}"); return jsonify({"status": "error", "message": "QR Code inválido ou não pago"}), 404
+
 # --- ROTAS DO PAINEL DO ADMINISTRADOR ---
 @app.route('/admin')
 @login_required
 def admin_dashboard():
     if not current_user.is_admin: return redirect(url_for('user_dashboard'))
-    return render_template('admin_dashboard.html')
+    return redirect(url_for('gerenciar_condominios'))
 
 @app.route('/admin/condominios', methods=['GET', 'POST'])
 @login_required
@@ -361,7 +371,7 @@ def excluir_utilizador(user_id):
     if user_para_excluir.is_admin:
         flash('Não é possível excluir um utilizador administrador.', 'danger'); return redirect(url_for('gerenciar_utilizadores'))
     Sale.query.filter_by(user_id=user_id).delete()
-    user_para_excluir.favorite_products.clear()
+    user_para_excluir.favorite_products = []
     db.session.delete(user_para_excluir); db.session.commit()
     flash(f'Utilizador {user_para_excluir.full_name} e todos os seus dados foram excluídos.', 'success')
     return redirect(url_for('gerenciar_utilizadores'))
@@ -426,35 +436,6 @@ def excluir_produto_catalogo(product_id):
     db.session.delete(produto_para_excluir); db.session.commit()
     flash(f'Produto "{produto_para_excluir.name}" foi excluído do catálogo global.', 'success')
     return redirect(url_for('gerenciar_catalogo'))
-
-@app.route('/admin/relatorios')
-@login_required
-def relatorios():
-    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
-    period = request.args.get('period', 'week'); condo_id = request.args.get('condo_id', 'all')
-    today = datetime.date.today()
-    if period == 'today': start_date = today
-    elif period == 'week': start_date = today - datetime.timedelta(days=today.weekday())
-    elif period == 'month': start_date = today.replace(day=1)
-    elif period == 'year': start_date = today.replace(month=1, day=1)
-    else: start_date = today - timedelta(days=6)
-    start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
-    sales_query = Sale.query.filter(Sale.status == 'paid', Sale.sale_timestamp >= start_datetime)
-    if condo_id != 'all': sales_query = sales_query.filter(Sale.condominio_id == int(condo_id))
-    sales = sales_query.order_by(Sale.sale_timestamp.desc()).all()
-    total_revenue = sum(s.price_at_sale for s in sales); total_cost = sum(s.cost_at_sale for s in sales)
-    gross_profit = total_revenue - total_cost; total_sales_count = len(sales)
-    kpis = {"total_revenue": total_revenue, "total_cost": total_cost, "gross_profit": gross_profit, "total_sales_count": total_sales_count}
-    sales_by_day = {}; current_date = start_date
-    while current_date <= today:
-        sales_by_day[current_date.strftime('%d/%m')] = 0
-        current_date += datetime.timedelta(days=1)
-    for sale in sales:
-        sale_day = sale.sale_timestamp.strftime('%d/%m')
-        if sale_day in sales_by_day: sales_by_day[sale_day] += sale.price_at_sale
-    chart_data = {"labels": list(sales_by_day.keys()), "values": list(sales_by_day.values())}
-    condominios = Condominio.query.order_by(Condominio.name).all()
-    return render_template('relatorio_geral.html', sales=sales, kpis=kpis, chart_data=chart_data, period=period, condominios=condominios, selected_condo_id=condo_id)
 
 # --- Bloco Principal para Executar a Aplicação ---
 if __name__ == '__main__':
