@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Admin - SmartBOX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h3 class="logo-text">SmartBOX Admin</h3>
+            </div>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}" class="active">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('selecionar_geladeira') }}">Gerir Geladeiras</a></li>
+                <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
+                <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
+                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <h1>Dashboard</h1>
+             <div class="card">
+                <h2>Bem-vindo ao Painel de Controlo, {{ current_user.full_name.split(' ')[0] }}!</h2>
+                <p>Utilize o menu à esquerda para gerir o seu sistema SmartBOX.</p>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

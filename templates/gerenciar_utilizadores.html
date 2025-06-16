@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestão de Utilizadores - SmartBOX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h3 class="logo-text">SmartBOX Admin</h3>
+            </div>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('selecionar_geladeira') }}">Gerir Geladeiras</a></li>
+                <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
+                <li><a href="{{ url_for('gerenciar_utilizadores') }}" class="active">Gestão de Utilizadores</a></li>
+                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <h1>Gestão de Utilizadores</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h2>Pesquisar Utilizador</h2>
+                <form method="POST" class="search-form">
+                    <input type="search" name="search" placeholder="Pesquisar por nome...">
+                    <button type="submit">Pesquisar</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>Lista de Utilizadores</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>CPF</th>
+                            <th>Condomínio</th>
+                            <th style="width: 40%;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in utilizadores %}
+                        <tr>
+                            <td>{{ user.full_name }}</td>
+                            <td>{{ user.cpf }}</td>
+                            <td>{{ user.condominio_name }}</td>
+                            <td class="actions">
+                                <form action="{{ url_for('alterar_senha_utilizador', user_id=user.id) }}" method="POST" class="inline-form">
+                                    <input type="password" name="new_password" placeholder="Nova palavra-passe" required>
+                                    <button type="submit">Alterar Senha</button>
+                                </form>
+                                <form action="{{ url_for('excluir_utilizador', user_id=user.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer excluir este utilizador? Esta ação é irreversível.');" class="inline-form">
+                                    <button type="submit" class="delete-btn">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align: center;">Nenhum utilizador encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Histórico - SmartBOX</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #121212; margin: 0; color: #e0e0e0; }
+        .navbar { background-color: #1f1f1f; padding: 10px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; }
+        .navbar .logo { height: 60px; }
+        .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+        h1 { color: #ffab4c; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 30px;}
+        .table-container { background-color: #1f1f1f; border-radius: 10px; padding: 20px; border: 1px solid #333; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; }
+        th { color: #a0a0a0; font-size: 14px; text-transform: uppercase; border-bottom: 2px solid #444; }
+        td { border-bottom: 1px solid #333; }
+        tr:last-child td { border-bottom: none; }
+        .empty-history { text-align: center; padding: 50px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #ffab4c; text-decoration: none; font-weight: 600; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('user_dashboard') }}"><img src="{{ url_for('static', filename='logo-smartbox.png') }}" alt="SmartBOX Logo" class="logo"></a>
+    </nav>
+    <div class="container">
+        <a href="{{ url_for('user_dashboard') }}" class="back-link">&larr; Voltar à loja</a>
+        <h1>Meu Histórico de Compras</h1>
+        
+        <div class="table-container">
+            {% if compras %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Produto</th>
+                        <th>Quantidade</th>
+                        <th>Valor Pago</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for compra in compras %}
+                    <tr>
+                        <td>{{ compra.sale_timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ compra.product.name }}</td>
+                        <td>{{ compra.quantity_sold }}</td>
+                        <td>R$ {{ "%.2f"|format(compra.price_at_sale) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-history">
+                <h2>Ainda não realizou nenhuma compra.</h2>
+                <p>Os seus pedidos aparecerão aqui assim que finalizar uma compra.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

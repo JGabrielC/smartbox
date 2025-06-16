@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SmartBOX</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        body { 
+            background-color: #121212; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            color: #e0e0e0;
+        }
+        
+        .login-container { 
+            background: #1f1f1f; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 380px; 
+            border: 1px solid #333;
+            box-sizing: border-box;
+            margin: 20px;
+        }
+
+        .logo-wrapper {
+            text-align: center;
+            margin-bottom: 30px; /* Espaço ajustado entre a logo e o formulário */
+        }
+
+        .logo { 
+            height: 120px; /* Tamanho ajustado para um visual mais equilibrado */
+            width: auto; 
+        }
+
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #a0a0a0; 
+            font-weight: 600; 
+            font-size: 14px;
+        }
+
+        input { 
+            width: 100%; 
+            padding: 12px 15px; 
+            border: 1px solid #444; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 16px; 
+            background-color: #2c2c2c; 
+            color: #ffffff;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #ffab4c;
+        }
+
+        .action-button { 
+            width: 100%; 
+            padding: 15px; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: background-color 0.3s; 
+        }
+        .action-button:hover { 
+            background-color: #218838; 
+        }
+        
+        .alert { 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-weight: 600;
+        }
+        .alert-danger { 
+            background-color: #5a2c2f; 
+            color: #f8d7da; 
+            border: 1px solid #e74c3c; 
+        }
+        
+        .register-link { 
+            text-align: center; 
+            margin-top: 25px; 
+            font-size: 14px;
+        }
+        .register-link a { 
+            color: #ffab4c; 
+            text-decoration: none; 
+            font-weight: 600; 
+        }
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-wrapper">
+            <img src="{{ url_for('static', filename='logo-smartbox.png') }}" alt="SmartBOX Logo" class="logo">
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{category}}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form action="{{ url_for('login') }}" method="POST">
+            <div class="form-group">
+                <label for="cpf">CPF</label>
+                <input type="text" id="cpf" name="cpf" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="action-button">Entrar</button>
+        </form>
+
+        <div class="register-link">
+            <p>Não tem uma conta? <a href="{{ url_for('cadastro') }}">Registe-se</a></p>
+        </div>
+    </div>
+</body>
+</html>

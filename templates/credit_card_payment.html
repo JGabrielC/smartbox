@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento com Cartão - SmartBOX</title>
+    <!-- SDK do Mercado Pago -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #121212; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; color: #e0e0e0;}
+        .payment-container { background: #1f1f1f; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border: 1px solid #333;}
+        h2 { text-align: center; margin-top: 0; color: #fff; }
+        .form-checkout { display: flex; flex-direction: column; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { font-weight: 600; color: #a0a0a0; margin-bottom: 5px; display: block; }
+        .form-control { height: 45px; padding: 0 10px; border-radius: 5px; border: 1px solid #444; background-color: #2c2c2c; width: 100%; box-sizing: border-box; }
+        .two-columns { display: flex; gap: 15px; }
+        .two-columns .form-group { flex: 1; }
+        .pay-button { padding: 15px; background-color: #ffab4c; color: #121212; border: none; border-radius: 5px; font-size: 18px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 10px; }
+        .pay-button:hover { background-color: #e69a45; }
+        #loader { display: none; text-align: center; margin-top: 15px; }
+        a.cancel-link { color: #a0a0a0; text-decoration: none; display: block; text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <h2>Pagar com Cartão</h2>
+        <p>Total a pagar: <strong>R$ {{ "%.2f"|format(total_amount) }}</strong></p>
+        
+        <form id="form-checkout" action="{{ url_for('processar_pagamento_cartao') }}" method="post">
+            <div class="form-group">
+                <label>Número do Cartão</label>
+                <div id="form-checkout__cardNumber-container" class="form-control"></div>
+            </div>
+            <div class="form-group">
+                <label for="form-checkout__cardholderName">Nome do Titular</label>
+                <input type="text" id="form-checkout__cardholderName" class="form-control" />
+            </div>
+            <div class="two-columns">
+                <div class="form-group">
+                    <label>Validade</label>
+                    <div id="form-checkout__expirationDate-container" class="form-control"></div>
+                </div>
+                <div class="form-group">
+                    <label>CVC</label>
+                    <div id="form-checkout__securityCode-container" class="form-control"></div>
+                </div>
+            </div>
+            
+            <!-- CAMPO DE CPF ADICIONADO -->
+            <div class="form-group">
+                <label for="form-checkout__identificationNumber">CPF do Titular</label>
+                <input type="text" id="form-checkout__identificationNumber" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <label>Banco Emissor</label>
+                <select id="form-checkout__issuer" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label>Parcelas</label>
+                <select id="form-checkout__installments" class="form-control"></select>
+            </div>
+            
+            <input type="hidden" name="token" id="token" />
+            <input type="hidden" name="issuer_id" id="issuer_id" />
+            <input type="hidden" name="payment_method_id" id="payment_method_id" />
+            <input type="hidden" name="transaction_amount" value="{{ total_amount }}" />
+            <input type="hidden" name="description" value="{{ description }}" />
+            <input type="hidden" name="order_id" value="{{ order_id }}" />
+            <input type="hidden" name="installments" id="installments_hidden" />
+            <!-- Campo oculto para o tipo de documento -->
+            <input type="hidden" name="identificationType" id="form-checkout__identificationType" value="CPF" />
+
+            <button type="submit" id="form-checkout__submit" class="pay-button">Pagar com Cartão</button>
+        </form>
+        <div id="loader">A processar...</div>
+        <a href="{{ url_for('ver_carrinho') }}" class="cancel-link">Cancelar</a>
+    </div>
+    
+    <script>
+        const mp = new MercadoPago('{{ public_key }}');
+        const cardForm = mp.cardForm({
+            amount: "{{ total_amount }}",
+            iframe: true,
+            form: {
+                id: "form-checkout",
+                cardNumber: { id: "form-checkout__cardNumber-container", placeholder: "0000 0000 0000 0000" },
+                expirationDate: { id: "form-checkout__expirationDate-container", placeholder: "MM/AA" },
+                securityCode: { id: "form-checkout__securityCode-container", placeholder: "123" },
+                cardholderName: { id: "form-checkout__cardholderName" },
+                issuer: { id: "form-checkout__issuer", placeholder: "Selecione o banco" },
+                installments: { id: "form-checkout__installments", placeholder: "Selecione as parcelas" },
+                identificationNumber: { id: "form-checkout__identificationNumber", placeholder: "000.000.000-00" },
+                identificationType: { id: "form-checkout__identificationType" }
+            },
+            callbacks: {
+                onFormMounted: error => { if (error) return console.warn("Form Mounted Handling error: ", error); },
+                onSubmit: event => {
+                    event.preventDefault();
+                    document.getElementById("form-checkout__submit").disabled = true;
+                    document.getElementById("loader").style.display = "block";
+                    
+                    const { paymentMethodId, issuerId, installments, identificationNumber, identificationType } = cardForm.getCardFormData();
+
+                    cardForm.createCardToken()
+                        .then(token => {
+                            document.getElementById('token').value = token;
+                            document.getElementById('issuer_id').value = issuerId;
+                            document.getElementById('payment_method_id').value = paymentMethodId;
+                            document.getElementById('installments_hidden').value = installments;
+                            // O campo identificationNumber já é enviado pelo seu nome de `id`
+                            document.getElementById('form-checkout').submit();
+                        })
+                        .catch(e => {
+                            console.error("Token creation error: ", e);
+                            alert("Verifique os dados do cartão e tente novamente.");
+                            document.getElementById("form-checkout__submit").disabled = false;
+                            document.getElementById("loader").style.display = "none";
+                        });
+                },
+            },
+        });
+    </script>
+</body>
+</html>

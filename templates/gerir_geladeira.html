@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerir Geladeira: {{ condo.name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h3 class="logo-text">SmartBOX Admin</h3>
+            </div>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('selecionar_geladeira') }}" class="active">Gerir Geladeiras</a></li>
+                <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
+                <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
+                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <a href="{{ url_for('selecionar_geladeira') }}" class="back-link">&larr; Voltar para a seleção</a>
+            <h1>A Gerir: Geladeira do <strong>{{ condo.name }}</strong></h1>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h2>Adicionar Produto do Catálogo</h2>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_from_catalog">
+                    <div class="form-group">
+                        <label>Selecione o Produto</label>
+                        <select name="product_id" required>
+                            <option value="" disabled selected>Escolha um produto...</option>
+                            {% for product in all_products %}
+                                <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantidade a Adicionar</label>
+                        <input type="number" name="quantity" min="1" required>
+                    </div>
+                    <button type="submit">Adicionar ao Stock</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>Stock Atual</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Quantidade Atual</th>
+                            <th style="width: 250px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory_items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>
+                                <form method="POST" class="inline-form">
+                                    <input type="hidden" name="action" value="update_quantity">
+                                    <input type="hidden" name="inventory_id" value="{{ item.id }}">
+                                    <input type="number" name="new_quantity" value="{{ item.quantity }}" min="0" required>
+                                    <button type="submit">Salvar</button>
+                                </form>
+                            </td>
+                            <td>
+                                <form method="POST" class="inline-form" onsubmit="return confirm('Tem a certeza?');">
+                                    <input type="hidden" name="action" value="remove_item">
+                                    <input type="hidden" name="inventory_id" value="{{ item.id }}">
+                                    <button type="submit" class="delete-btn">Remover</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" style="text-align: center;">A geladeira deste condomínio está vazia.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

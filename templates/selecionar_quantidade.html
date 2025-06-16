@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selecionar Quantidade - SmartBOX</title>
+    <style>
+        body { 
+            font-family: -apple-system, sans-serif; 
+            background-color: #121212; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+            box-sizing: border-box; 
+        }
+        .cart-box { 
+            background: #1f1f1f; 
+            padding: 40px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 450px; 
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+        .product-summary { 
+            display: flex; 
+            align-items: center; 
+            gap: 20px; 
+            border-bottom: 1px solid #444; 
+            padding-bottom: 20px; 
+        }
+        .product-summary img { 
+            width: 80px; 
+            height: 80px; 
+            object-fit: cover; 
+            border-radius: 8px; 
+            flex-shrink: 0; 
+        }
+        .product-summary h3 { 
+            margin: 0; 
+            color: #ffffff;
+        }
+        
+        .quantity-selector { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 30px 0; 
+            background-color: #2c2c2c;
+            border-radius: 8px;
+            border: 1px solid #444;
+            overflow: hidden;
+        }
+        .quantity-selector button { 
+            font-size: 28px; 
+            font-weight: bold;
+            width: 60px; 
+            height: 60px; 
+            border: none;
+            background-color: transparent;
+            color: #ffab4c; 
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .quantity-selector button:hover {
+            background-color: #3d3d3d;
+        }
+        .quantity-selector input { 
+            width: 80px; 
+            height: 60px; 
+            text-align: center; 
+            font-size: 24px; 
+            font-weight: bold;
+            border: none;
+            background-color: transparent; 
+            color: #ffffff;
+            -moz-appearance: textfield; 
+        }
+        .quantity-selector input::-webkit-outer-spin-button,
+        .quantity-selector input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .total-section { 
+            margin-top: 20px; 
+            text-align: center; 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #ffffff;
+        }
+        .total-section span {
+            color: #ffab4c;
+        }
+
+        /* --- ESTILOS DOS BOTÕES DE PAGAMENTO CORRIGIDOS --- */
+        .payment-options { 
+            display: flex; 
+            flex-direction: row; /* Alinha os botões lado a lado */
+            gap: 15px; 
+            margin-top: 30px; 
+        }
+        .payment-button { 
+            display: block; 
+            flex: 1; /* Faz com que ambos os botões ocupem o espaço de forma igual */
+            padding: 15px; 
+            border: none; border-radius: 5px; font-size: 16px; 
+            font-weight: 700; cursor: pointer; text-align: center; 
+            text-decoration: none; transition: background-color 0.2s;
+        }
+        .pix-btn { background-color: #28a745; color: white;} 
+        .pix-btn:hover { background-color: #218838; }
+        
+        .card-btn { background-color: #ffab4c; color: #121212; } 
+        .card-btn:hover { background-color: #e69a45; }
+        
+        a.cancel-link { 
+            color: #ffab4c; 
+            text-decoration: none; 
+            display: block; 
+            margin-top: 25px; 
+            text-align: center; 
+            width: 100%;
+            font-weight: 600;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        a.cancel-link:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="cart-box">
+        <div class="product-summary">
+            <img src="{{ item.product.image_url or 'https://placehold.co/100x100/eeeeee/cccccc?text=Produto' }}">
+            <div>
+                <h3>{{ item.product.name }}</h3>
+                <span>R$ {{ "%.2f"|format(item.product.sell_price) }} / unidade</span>
+            </div>
+        </div>
+        
+        <div class="quantity-selector">
+            <button type="button" id="btn-minus">-</button>
+            <input type="number" id="quantity" name="quantity" value="1" min="1" max="{{ item.quantity }}">
+            <button type="button" id="btn-plus">+</button>
+        </div>
+        
+        <div class="total-section">Total: <span id="total-price">R$ {{ "%.2f"|format(item.product.sell_price) }}</span></div>
+        
+        <div class="payment-options">
+            <a href="#" id="card-payment-link" class="payment-button card-btn">Pagar com Cartão</a>
+            <a href="#" id="pix-payment-link" class="payment-button pix-btn">Pagar com PIX</a>
+        </div>
+        
+        <a href="{{ url_for('user_dashboard') }}" class="cancel-link">Cancelar e voltar à loja</a>
+    </div>
+    
+    <script>
+        const btnMinus = document.getElementById('btn-minus');
+        const btnPlus = document.getElementById('btn-plus');
+        const quantityInput = document.getElementById('quantity');
+        const totalPriceSpan = document.getElementById('total-price');
+        const pixLink = document.getElementById('pix-payment-link');
+        const cardLink = document.getElementById('card-payment-link');
+        
+        const unitPrice = parseFloat({{ item.product.sell_price }});
+        const maxQuantity = parseInt({{ item.quantity }});
+
+        function updateAll() {
+            let currentQuantity = parseInt(quantityInput.value);
+            if (isNaN(currentQuantity) || currentQuantity < 1) {
+                currentQuantity = 1;
+            }
+            if (currentQuantity > maxQuantity) {
+                currentQuantity = maxQuantity;
+            }
+            quantityInput.value = currentQuantity;
+            const newTotal = (unitPrice * currentQuantity).toFixed(2);
+            totalPriceSpan.innerText = `R$ ${newTotal.replace('.', ',')}`;
+
+            pixLink.href = `/gerar_pix?inventory_id={{item.id}}&quantity=${currentQuantity}`;
+            cardLink.href = `/iniciar_pagamento_cartao?inventory_id={{item.id}}&quantity=${currentQuantity}`;
+        }
+
+        btnMinus.addEventListener('click', () => {
+            if (parseInt(quantityInput.value) > 1) {
+                quantityInput.value = parseInt(quantityInput.value) - 1;
+                updateAll();
+            }
+        });
+
+        btnPlus.addEventListener('click', () => {
+            if (parseInt(quantityInput.value) < maxQuantity) {
+                quantityInput.value = parseInt(quantityInput.value) + 1;
+                updateAll();
+            }
+        });
+
+        quantityInput.addEventListener('change', updateAll);
+        quantityInput.addEventListener('keyup', updateAll);
+
+        document.addEventListener('DOMContentLoaded', updateAll);
+    </script>
+</body>
+</html>

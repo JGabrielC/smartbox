@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento Aprovado!</title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; font-family: -apple-system, sans-serif; text-align: center; background-color: #121212; color: #e0e0e0; padding: 20px; }
+        .status-box { background: #1f1f1f; padding: 40px 60px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #333; }
+        .status-icon { font-size: 80px; color: #28a745; line-height: 1; }
+        h1 { color: #fff; }
+        .unlock-qr-code { max-width: 200px; margin: 20px auto; display: block; border-radius: 8px; }
+        .footer-note { font-size: 14px; color: #a0a0a0; margin-top: 30px;}
+        .back-link { color: #ffab4c; font-weight: 600; text-decoration: none; margin-top: 20px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="status-box">
+        <div class="status-icon">✓</div>
+        <h1>Obrigado pela compra!</h1>
+        <p>Aproxime o código abaixo do leitor na geladeira para a destravar.</p>
+        <img src="{{ qr_code_url }}" alt="QR Code de Acesso" class="unlock-qr-code">
+        <p class="footer-note"><strong>Não se esqueça de fechar a porta!</strong></p>
+        <a href="{{ url_for('user_dashboard') }}" class="back-link">Voltar à loja</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventário: {{ condo.name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <h3>SmartBOX</h3>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('gerenciar_produtos') }}">Produtos</a></li>
+                <li><a href="{{ url_for('selecionar_inventario') }}" class="active">Inventário</a></li>
+                <li><a href="#">Relatórios</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <a href="{{ url_for('selecionar_inventario') }}">&larr; Voltar para a seleção</a>
+            <h1>Inventário: <strong>{{ condo.name }}</strong></h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h2>Adicionar / Reabastecer Produto</h2>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="product_id">Selecione o Produto</label>
+                        <select name="product_id" required>
+                            <option value="" disabled selected>Escolha um produto...</option>
+                            {% for product in all_products %}
+                            <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Nova Quantidade em Estoque</label>
+                        <input type="number" name="quantity" min="0" required placeholder="Ex: 20">
+                    </div>
+                    <button type="submit">Salvar Estoque</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Estoque Atual</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Quantidade Atual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory_items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2">A geladeira deste condomínio está vazia.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

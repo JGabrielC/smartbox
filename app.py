@@ -1,0 +1,463 @@
+import os
+import datetime
+import requests
+import uuid
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from models import db, User, Condominio, Product, Inventory, Sale
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
+from PIL import Image
+import secrets
+from datetime import timedelta
+
+# --- Configuração da Aplicação ---
+app = Flask(__name__)
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'geladeira.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'uma-chave-secreta-muito-dificil-de-adivinhar'
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/profile_pics')
+
+# --- CONFIGURAÇÃO DO MERCADO PAGO ---
+# ATENÇÃO: Substitua pelas suas chaves reais de PRODUÇÃO do Mercado Pago
+MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR-2683965692592409-071011-19820758846ee46db59f8bb79039b115-250701524'
+MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-d2bb5f89-dd93-4e13-823d-f75c2fa40e3d'
+MERCADO_PAGO_API_URL = 'https://api.mercadopago.com/v1/payments'
+
+db.init_app(app)
+
+# --- Configuração do Flask-Login ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = "Por favor, inicie a sessão para aceder a esta página."
+login_manager.login_message_category = "info"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- Funções Auxiliares ---
+def save_picture(form_picture):
+    random_hex = secrets.token_hex(8)
+    _, f_ext = os.path.splitext(form_picture.filename)
+    picture_fn = random_hex + f_ext
+    picture_path = os.path.join(app.config['UPLOAD_FOLDER'], picture_fn)
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    i = Image.open(form_picture)
+    i.thumbnail((150, 150))
+    i.save(picture_path)
+    return picture_fn
+
+# --- ROTAS DE AUTENTICAÇÃO ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin_dashboard' if current_user.is_admin else 'user_dashboard'))
+    if request.method == 'POST':
+        cpf = request.form.get('cpf')
+        password = request.form.get('password')
+        user = User.query.filter_by(cpf=cpf).first()
+        if user and user.check_password(password):
+            login_user(user, remember=True)
+            return redirect(url_for('admin_dashboard' if user.is_admin else 'user_dashboard'))
+        else:
+            flash('CPF ou palavra-passe incorretos. Tente novamente.', 'danger')
+            return redirect(url_for('login'))
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    session.pop('cart', None)
+    flash('Sessão terminada com sucesso.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name'); cpf = request.form.get('cpf'); birth_date = request.form.get('birth_date'); password = request.form.get('password'); condominio_name = request.form.get('condominio_name'); apartment_address = request.form.get('apartment_address')
+        if User.query.filter_by(cpf=cpf).first():
+            flash('Este CPF já foi registado.', 'error'); return redirect(url_for('cadastro'))
+        new_user = User(full_name=full_name, cpf=cpf, birth_date=birth_date, condominio_name=condominio_name, apartment_address=apartment_address); new_user.set_password(password)
+        db.session.add(new_user); db.session.commit()
+        flash('Registo efetuado com sucesso! Inicie a sessão.', 'success')
+        return redirect(url_for('login'))
+    condominios_disponiveis = Condominio.query.order_by(Condominio.name).all()
+    return render_template('cadastro.html', condominios=condominios_disponiveis)
+
+# --- ROTAS DO PAINEL DO UTILIZADOR ---
+@app.route('/')
+@app.route('/dashboard')
+@login_required
+def user_dashboard():
+    if current_user.is_admin: return redirect(url_for('admin_dashboard'))
+    condo = Condominio.query.filter_by(name=current_user.condominio_name).first()
+    products_in_condo = []
+    if condo:
+        products_in_condo = Inventory.query.filter_by(condominio_id=condo.id).filter(Inventory.quantity > 0).all()
+    todos_condominios = Condominio.query.order_by(Condominio.name).all()
+    favorite_ids = {fav.id for fav in current_user.favorite_products}
+    return render_template('user_dashboard.html', products_in_condo=products_in_condo, todos_condominios=todos_condominios, favorite_ids=favorite_ids)
+
+# --- ROTAS DE GESTÃO DO UTILIZADOR ---
+@app.route('/meu_historico')
+@login_required
+def meu_historico():
+    compras = Sale.query.filter_by(user_id=current_user.id, status='paid').order_by(Sale.sale_timestamp.desc()).all()
+    return render_template('meu_historico.html', compras=compras)
+
+@app.route('/meu_perfil', methods=['GET', 'POST'])
+@login_required
+def meu_perfil():
+    if request.method == 'POST':
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file.filename != '':
+                picture_file = save_picture(file); current_user.profile_image = picture_file
+                db.session.commit(); flash('A sua foto de perfil foi atualizada!', 'success')
+                return redirect(url_for('meu_perfil'))
+        old_password = request.form.get('old_password'); new_password = request.form.get('new_password')
+        if old_password and new_password:
+            confirm_password = request.form.get('confirm_password')
+            if not current_user.check_password(old_password): flash('A sua palavra-passe antiga está incorreta.', 'danger')
+            elif new_password != confirm_password: flash('As novas palavras-passe não coincidem.', 'danger')
+            else:
+                current_user.set_password(new_password); db.session.commit()
+                flash('Palavra-passe alterada com sucesso!', 'success')
+                return redirect(url_for('meu_perfil'))
+    return render_template('meu_perfil.html')
+
+@app.route('/toggle_favorite/<int:product_id>', methods=['POST'])
+@login_required
+def toggle_favorite(product_id):
+    produto = Product.query.get_or_404(product_id)
+    if produto in current_user.favorite_products: current_user.favorite_products.remove(produto)
+    else: current_user.favorite_products.append(produto)
+    db.session.commit(); return jsonify({'status': 'ok'})
+
+@app.route('/update_my_condo', methods=['POST'])
+@login_required
+def update_my_condo():
+    novo_condominio = request.form.get('new_condo_name')
+    if novo_condominio:
+        utilizador = User.query.get(current_user.id); utilizador.condominio_name = novo_condominio
+        session.pop('cart', None)
+        db.session.commit(); flash('O seu condomínio foi alterado com sucesso! A loja foi atualizada.', 'success')
+    return redirect(url_for('user_dashboard'))
+
+# --- ROTAS DO CARRINHO E CHECKOUT ---
+@app.route('/adicionar_carrinho/<int:inventory_id>', methods=['POST'])
+@login_required
+def adicionar_carrinho(inventory_id):
+    cart = session.get('cart', {}); item_id_str = str(inventory_id)
+    item = Inventory.query.get_or_404(inventory_id)
+    current_quantity_in_cart = cart.get(item_id_str, 0)
+    if current_quantity_in_cart >= item.quantity: return jsonify({'status': 'error', 'message': 'Stock insuficiente!'})
+    cart[item_id_str] = cart.get(item_id_str, 0) + 1
+    session['cart'] = cart
+    return jsonify({'status': 'ok', 'cart_item_count': len(cart)})
+
+@app.route('/carrinho')
+@login_required
+def ver_carrinho():
+    cart = session.get('cart', {}); cart_items = []; total_geral = 0
+    for inv_id, quantity in cart.items():
+        item = Inventory.query.get(int(inv_id))
+        if item:
+            subtotal = item.product.sell_price * quantity
+            cart_items.append({'id': item.id, 'product': item.product, 'quantity': quantity, 'max_quantity': item.quantity, 'subtotal': subtotal})
+            total_geral += subtotal
+    return render_template('carrinho.html', cart_items=cart_items, total_geral=total_geral)
+
+@app.route('/atualizar_carrinho', methods=['POST'])
+@login_required
+def atualizar_carrinho():
+    cart = session.get('cart', {}); inv_id_str = request.form.get('inventory_id'); quantity = int(request.form.get('quantity'))
+    item = Inventory.query.get_or_404(int(inv_id_str))
+    if 0 < quantity <= item.quantity: cart[inv_id_str] = quantity
+    elif quantity <= 0: cart.pop(inv_id_str, None)
+    else: flash('Quantidade inválida ou superior ao stock.', 'danger')
+    session['cart'] = cart
+    return redirect(url_for('ver_carrinho'))
+
+@app.route('/remover_do_carrinho', methods=['POST'])
+@login_required
+def remover_do_carrinho():
+    cart = session.get('cart', {}); inv_id_str = request.form.get('inventory_id')
+    if inv_id_str in cart: cart.pop(inv_id_str, None)
+    session['cart'] = cart
+    return redirect(url_for('ver_carrinho'))
+
+@app.route('/finalizar_compra/<string:method>')
+@login_required
+def finalizar_compra(method):
+    cart = session.get('cart', {});
+    if not cart: return redirect(url_for('user_dashboard'))
+    total_amount = 0; description_items = []; order_id = str(uuid.uuid4())
+    for inv_id, quantity in cart.items():
+        item = Inventory.query.get(int(inv_id));
+        if not item or item.quantity < quantity:
+            flash(f"Stock insuficiente para {item.product.name}. Por favor, ajuste o seu carrinho.", "danger"); return redirect(url_for('ver_carrinho'))
+        total_amount += item.product.sell_price * quantity
+        description_items.append(f"{quantity}x {item.product.name}")
+        nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
+        db.session.add(nova_venda)
+    db.session.commit()
+    total_amount = round(total_amount, 2); description = ", ".join(description_items)
+    
+    if method == 'pix':
+        return redirect(url_for('gerar_pix_carrinho', order_id=order_id, total_amount=total_amount, description=description))
+    elif method == 'card':
+        return render_template('credit_card_payment.html', public_key=MERCADO_PAGO_PUBLIC_KEY, total_amount=total_amount, description=description, order_id=order_id)
+
+@app.route('/gerar_pix_carrinho')
+@login_required
+def gerar_pix_carrinho():
+    order_id = request.args.get('order_id'); total_amount = request.args.get('total_amount'); description = request.args.get('description')
+    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
+    notification_url = url_for('webhook_mercado_pago', _external=True)
+    payload = {"transaction_amount": float(total_amount), "description": description, "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"}, "external_reference": order_id}
+    try:
+        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); response.raise_for_status()
+        payment_data = response.json(); sale_payment_id = str(payment_data['id'])
+        Sale.query.filter_by(payment_id=order_id).update({"payment_id": sale_payment_id}); db.session.commit()
+        qr_code = payment_data['point_of_interaction']['transaction_data']['qr_code']; qr_code_base64 = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
+        return render_template('payment.html', qr_code=qr_code, qr_code_base64=qr_code_base64, sale_payment_id=sale_payment_id)
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao comunicar com o Mercado Pago: {e}"); flash('Não foi possível iniciar o pagamento PIX.', 'error'); return redirect(url_for('ver_carrinho'))
+
+@app.route('/processar_pagamento_cartao', methods=['POST'])
+@login_required
+def processar_pagamento_cartao():
+    token = request.form.get('token'); issuer_id = request.form.get('issuer_id'); payment_method_id = request.form.get('payment_method_id')
+    installments = int(request.form.get('installments')); transaction_amount = float(request.form.get('transaction_amount'))
+    order_id = request.form.get('order_id'); description = request.form.get('description')
+    doc_type = request.form.get('identificationType'); doc_number = request.form.get('form-checkout__identificationNumber')
+    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': str(uuid.uuid4())}
+    payload = {
+        "transaction_amount": transaction_amount, "token": token, "description": description, "installments": installments, 
+        "payment_method_id": payment_method_id, "issuer_id": issuer_id, "external_reference": order_id,
+        "payer": {
+            "email": f"cliente_{current_user.id}@smartbox.com",
+            "identification": { "type": doc_type, "number": doc_number.replace('.', '').replace('-', '') }
+        }
+    }
+    try:
+        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); payment_data = response.json()
+        print("--- RESPOSTA DO MERCADO PAGO ---"); print(payment_data); print("---------------------------------")
+        if response.ok and payment_data.get('status') == 'approved':
+            sale_payment_id = str(payment_data.get('id'))
+            for venda in Sale.query.filter_by(payment_id=order_id).all():
+                venda.status = 'paid'; venda.payment_id = sale_payment_id
+                item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
+                if item: item.quantity -= venda.quantity_sold
+            session.pop('cart', None); db.session.commit()
+            return redirect(url_for('payment_success'))
+        else:
+            error_message = payment_data.get('message', 'Erro desconhecido.'); status_detail = payment_data.get('status_detail', '')
+            flash(f"Pagamento recusado: {error_message} ({status_detail})", 'danger')
+            return redirect(url_for('ver_carrinho'))
+    except requests.exceptions.RequestException as e:
+        flash("Ocorreu um erro de comunicação.", "danger"); return redirect(url_for('ver_carrinho'))
+
+@app.route('/webhook/pix', methods=['POST'])
+def webhook_mercado_pago():
+    data = request.json
+    if data and data.get('type') == 'payment':
+        payment_id = str(data['data']['id'])
+        response = requests.get(f'{MERCADO_PAGO_API_URL}/{payment_id}', headers={'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'})
+        if response.ok:
+            payment_info = response.json(); order_id = payment_info.get('external_reference')
+            if payment_info.get('status') == 'approved':
+                vendas = Sale.query.filter_by(payment_id=order_id).all()
+                if vendas and vendas[0].status == 'pending':
+                    for venda in vendas:
+                        venda.status = 'paid'; venda.payment_id = payment_id
+                        item = Inventory.query.filter_by(condominio_id=venda.condominio_id, product_id=venda.product_id).first()
+                        if item: item.quantity -= venda.quantity_sold
+                    db.session.commit()
+                    print(f"PAGAMENTO PIX APROVADO VIA WEBHOOK! Ordem ID: {order_id}.")
+    return jsonify({"status": "ok"}), 200
+
+@app.route('/check_payment_status/<string:sale_payment_id>')
+@login_required
+def check_payment_status(sale_payment_id):
+    venda = Sale.query.filter_by(payment_id=sale_payment_id).first()
+    if venda and venda.status == 'paid': session.pop('cart', None)
+    return jsonify({"status": venda.status if venda else "not_found"})
+
+@app.route('/payment_success')
+@login_required
+def payment_success():
+    return render_template('payment_success.html')
+
+@app.route('/payment_failed')
+@login_required
+def payment_failed():
+    return render_template('payment_failed.html')
+
+# --- ROTAS DO PAINEL DO ADMINISTRADOR ---
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    return render_template('admin_dashboard.html')
+
+@app.route('/admin/condominios', methods=['GET', 'POST'])
+@login_required
+def gerenciar_condominios():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    if request.method == 'POST':
+        condo_name = request.form.get('condo_name'); responsible_name = request.form.get('responsible_name')
+        if Condominio.query.filter_by(name=condo_name).first(): flash('Já existe um condomínio com este nome.', 'error')
+        else:
+            new_condo = Condominio(name=condo_name, responsible_name=responsible_name); db.session.add(new_condo); db.session.commit()
+            flash('Condomínio adicionado com sucesso!', 'success')
+        return redirect(url_for('gerenciar_condominios'))
+    todos_condominios = Condominio.query.order_by(Condominio.name).all()
+    return render_template('gerenciar_condominios.html', condominios=todos_condominios)
+
+@app.route('/admin/condominios/excluir/<int:condo_id>', methods=['POST'])
+@login_required
+def excluir_condominio(condo_id):
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    condo_para_excluir = Condominio.query.get_or_404(condo_id)
+    Inventory.query.filter_by(condominio_id=condo_id).delete(); Sale.query.filter_by(condominio_id=condo_id).delete()
+    User.query.filter_by(condominio_name=condo_para_excluir.name).update({"condominio_name": "N/A (Condomínio Removido)"})
+    db.session.delete(condo_para_excluir); db.session.commit()
+    flash(f'Condomínio "{condo_para_excluir.name}" e todos os seus dados foram excluídos com sucesso.', 'success')
+    return redirect(url_for('gerenciar_condominios'))
+
+@app.route('/admin/utilizadores', methods=['GET', 'POST'])
+@login_required
+def gerenciar_utilizadores():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    query = User.query.filter_by(is_admin=False)
+    if request.method == 'POST':
+        search_query = request.form.get('search')
+        if search_query: query = query.filter(User.full_name.ilike(f'%{search_query}%'))
+    utilizadores = query.order_by(User.full_name).all()
+    return render_template('gerenciar_utilizadores.html', utilizadores=utilizadores)
+
+@app.route('/admin/utilizadores/alterar_senha/<int:user_id>', methods=['POST'])
+@login_required
+def alterar_senha_utilizador(user_id):
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    user = User.query.get_or_404(user_id)
+    nova_senha = request.form.get('new_password')
+    if not nova_senha: flash('Nenhuma palavra-passe fornecida.', 'danger')
+    else:
+        user.set_password(nova_senha); db.session.commit()
+        flash(f'Palavra-passe do utilizador {user.full_name} alterada com sucesso.', 'success')
+    return redirect(url_for('gerenciar_utilizadores'))
+
+@app.route('/admin/utilizadores/excluir/<int:user_id>', methods=['POST'])
+@login_required
+def excluir_utilizador(user_id):
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    user_para_excluir = User.query.get_or_404(user_id)
+    if user_para_excluir.is_admin:
+        flash('Não é possível excluir um utilizador administrador.', 'danger'); return redirect(url_for('gerenciar_utilizadores'))
+    Sale.query.filter_by(user_id=user_id).delete()
+    user_para_excluir.favorite_products.clear()
+    db.session.delete(user_para_excluir); db.session.commit()
+    flash(f'Utilizador {user_para_excluir.full_name} e todos os seus dados foram excluídos.', 'success')
+    return redirect(url_for('gerenciar_utilizadores'))
+
+@app.route('/admin/geladeiras')
+@login_required
+def selecionar_geladeira():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    condominios = Condominio.query.order_by(Condominio.name).all()
+    return render_template('selecionar_geladeira.html', condominios=condominios)
+
+@app.route('/admin/geladeira/<int:condo_id>', methods=['GET', 'POST'])
+@login_required
+def gerir_geladeira(condo_id):
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    condo = Condominio.query.get_or_404(condo_id)
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'add_from_catalog':
+            product_id = request.form.get('product_id'); quantity = request.form.get('quantity')
+            if not product_id or not quantity or int(quantity) < 0: flash('Selecione um produto e uma quantidade válida.', 'error')
+            else:
+                existing_item = Inventory.query.filter_by(condominio_id=condo_id, product_id=product_id).first()
+                if existing_item:
+                    existing_item.quantity += int(quantity); flash(f'Stock de "{existing_item.product.name}" reabastecido.', 'success')
+                else:
+                    new_item = Inventory(condominio_id=condo_id, product_id=product_id, quantity=int(quantity)); db.session.add(new_item); flash('Produto adicionado ao inventário da geladeira.', 'success')
+                db.session.commit()
+        elif action == 'remove_item':
+            inventory_id = request.form.get('inventory_id'); item_to_remove = Inventory.query.get(inventory_id)
+            if item_to_remove: flash(f'Produto "{item_to_remove.product.name}" removido da geladeira.', 'success'); db.session.delete(item_to_remove); db.session.commit()
+        elif action == 'update_quantity':
+            inventory_id = request.form.get('inventory_id'); new_quantity = request.form.get('new_quantity')
+            if new_quantity and int(new_quantity) >= 0:
+                item_to_update = Inventory.query.get(inventory_id)
+                if item_to_update: item_to_update.quantity = int(new_quantity); flash(f'Stock de "{item_to_update.product.name}" atualizado.', 'success'); db.session.commit()
+        return redirect(url_for('gerir_geladeira', condo_id=condo_id))
+    inventory_items = Inventory.query.filter_by(condominio_id=condo_id).all()
+    all_products = Product.query.order_by(Product.name).all()
+    return render_template('gerir_geladeira.html', condo=condo, inventory_items=inventory_items, all_products=all_products)
+
+@app.route('/admin/catalogo', methods=['GET', 'POST'])
+@login_required
+def gerenciar_catalogo():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    if request.method == 'POST':
+        name = request.form.get('product_name'); cost_price = request.form.get('cost_price'); sell_price = request.form.get('sell_price'); image_url = request.form.get('image_url')
+        if Product.query.filter_by(name=name).first():
+            flash('Já existe um produto com este nome no catálogo.', 'error')
+        else:
+            new_product = Product(name=name, cost_price=float(cost_price), sell_price=float(sell_price), image_url=image_url); db.session.add(new_product); db.session.commit(); flash('Produto adicionado ao catálogo com sucesso!', 'success')
+        return redirect(url_for('gerenciar_catalogo'))
+    todos_produtos = Product.query.order_by(Product.name).all()
+    return render_template('gerenciar_catalogo.html', produtos=todos_produtos)
+
+@app.route('/admin/catalogo/excluir/<int:product_id>', methods=['POST'])
+@login_required
+def excluir_produto_catalogo(product_id):
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    produto_para_excluir = Product.query.get_or_404(product_id)
+    Inventory.query.filter_by(product_id=product_id).delete(); Sale.query.filter_by(product_id=product_id).delete()
+    db.session.delete(produto_para_excluir); db.session.commit()
+    flash(f'Produto "{produto_para_excluir.name}" foi excluído do catálogo global.', 'success')
+    return redirect(url_for('gerenciar_catalogo'))
+
+@app.route('/admin/relatorios')
+@login_required
+def relatorios():
+    if not current_user.is_admin: return redirect(url_for('user_dashboard'))
+    period = request.args.get('period', 'week'); condo_id = request.args.get('condo_id', 'all')
+    today = datetime.date.today()
+    if period == 'today': start_date = today
+    elif period == 'week': start_date = today - datetime.timedelta(days=today.weekday())
+    elif period == 'month': start_date = today.replace(day=1)
+    elif period == 'year': start_date = today.replace(month=1, day=1)
+    else: start_date = today - timedelta(days=6)
+    start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
+    sales_query = Sale.query.filter(Sale.status == 'paid', Sale.sale_timestamp >= start_datetime)
+    if condo_id != 'all': sales_query = sales_query.filter(Sale.condominio_id == int(condo_id))
+    sales = sales_query.order_by(Sale.sale_timestamp.desc()).all()
+    total_revenue = sum(s.price_at_sale for s in sales); total_cost = sum(s.cost_at_sale for s in sales)
+    gross_profit = total_revenue - total_cost; total_sales_count = len(sales)
+    kpis = {"total_revenue": total_revenue, "total_cost": total_cost, "gross_profit": gross_profit, "total_sales_count": total_sales_count}
+    sales_by_day = {}; current_date = start_date
+    while current_date <= today:
+        sales_by_day[current_date.strftime('%d/%m')] = 0
+        current_date += datetime.timedelta(days=1)
+    for sale in sales:
+        sale_day = sale.sale_timestamp.strftime('%d/%m')
+        if sale_day in sales_by_day: sales_by_day[sale_day] += sale.price_at_sale
+    chart_data = {"labels": list(sales_by_day.keys()), "values": list(sales_by_day.values())}
+    condominios = Condominio.query.order_by(Condominio.name).all()
+    return render_template('relatorio_geral.html', sales=sales, kpis=kpis, chart_data=chart_data, period=period, condominios=condominios, selected_condo_id=condo_id)
+
+# --- Bloco Principal para Executar a Aplicação ---
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000, debug=True)

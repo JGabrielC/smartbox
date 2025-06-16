@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Selecionar Inventário - SmartBOX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <h3>SmartBOX</h3>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('gerenciar_produtos') }}">Produtos</a></li>
+                <li><a href="{{ url_for('selecionar_inventario') }}" class="active">Inventário</a></li>
+                <li><a href="#">Relatórios</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <h1>Gerenciar Inventário</h1>
+            <div class="card">
+                <h2>Selecione o Condomínio</h2>
+                <p>Clique em um condomínio abaixo para ver e gerenciar o estoque da geladeira correspondente.</p>
+                <ul class="condo-list">
+                    {% for condo in condominios %}
+                        <li>
+                            <a href="{{ url_for('gerenciar_inventario_condo', condo_id=condo.id) }}">
+                                {{ condo.name }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li>Nenhum condomínio cadastrado. Adicione um na aba "Condomínios".</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

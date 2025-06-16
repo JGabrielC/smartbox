@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBOX - Loja</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background-color: #121212; 
+            margin: 0; 
+            color: #e0e0e0; 
+        }
+        
+        .navbar {
+            background-color: #1f1f1f; padding: 10px 30px;
+            display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+            border-bottom: 1px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            position: sticky; top: 0; z-index: 998;
+        }
+        .navbar .logo {
+            grid-column: 1; justify-self: start; height: 100px; width: auto;
+        }
+        .navbar .nav-actions {
+            grid-column: 3; justify-self: end;
+            display: flex; align-items: center; gap: 25px;
+        }
+        .navbar .cart-icon {
+            color: #e0e0e0; text-decoration: none;
+            font-size: 28px; position: relative;
+        }
+        .navbar .cart-badge {
+            position: absolute; top: -5px; right: -10px;
+            background-color: #ffab4c; color: #121212;
+            border-radius: 50%; padding: 2px 6px;
+            font-size: 12px; font-weight: bold;
+        }
+        .hamburger-menu {
+            display: block;
+            background: none; border: none; cursor: pointer; padding: 10px;
+        }
+        .hamburger-menu .bar {
+            display: block; width: 25px; height: 3px; margin: 5px auto;
+            background-color: #e0e0e0; transition: all 0.3s ease-in-out;
+        }
+
+        .sidebar {
+            height: 100%; width: 280px; position: fixed; z-index: 1000;
+            top: 0; right: -300px; background-color: #1f1f1f;
+            overflow-x: hidden; transition: 0.3s;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column;
+            padding: 20px; box-sizing: border-box;
+        }
+        .sidebar .close-btn { position: absolute; top: 15px; right: 25px; font-size: 36px; background: none; border: none; color: #a0a0a0; cursor: pointer; }
+        .sidebar .sidebar-links { display: flex; flex-direction: column; gap: 25px; width: 100%; margin-top: 50px; }
+        .sidebar .sidebar-links a { font-size: 18px; color: #ffab4c; text-decoration: none; font-weight: 600; }
+        .sidebar .condo-changer-form { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; border-top: 1px solid #444; padding-top: 25px; }
+        .sidebar .condo-changer-form label { font-size: 18px; font-weight: 600; color: #ffab4c; }
+        .sidebar .condo-changer-form select { width: 100%; box-sizing: border-box; background-color: #2c2c2c; color: #ffffff; border: 1px solid #444; border-radius: 5px; padding: 10px; font-size: 16px; }
+        .sidebar .condo-changer-form button { width: 100%; box-sizing: border-box; background-color: #ffab4c; color: #121212; border: none; border-radius: 5px; padding: 10px; cursor: pointer; font-weight: 700; font-size: 16px; }
+        .sidebar .logout-link { margin-top: auto; color: #e74c3c; }
+
+        .overlay { height: 100%; width: 100%; position: fixed; z-index: 999; top: 0; left: 0; background-color: rgba(0,0,0,0.7); display: none; }
+        body.sidebar-open .sidebar { right: 0; }
+        body.sidebar-open .overlay { display: block; }
+
+        .container { padding: 30px; }
+        
+        .page-header {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .page-header h1 {
+            color: #ffffff;
+            font-size: 2.2rem;
+            margin: 0 0 5px 0;
+            border: none;
+            padding: 0;
+        }
+        .page-header .location-info {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+            margin: 0 0 25px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .page-header strong { color: #ffab4c; }
+
+        .search-wrapper { position: relative; display: flex; justify-content: center; }
+        .search-container { width: 100%; max-width: 500px; }
+        .search-container input { width: 100%; padding: 15px; font-size: 16px; border-radius: 50px; border: 1px solid #444; background-color: #2c2c2c; color: #ffffff; box-sizing: border-box; }
+        .search-container input:focus { outline: none; border-color: #ffab4c; }
+
+        .suggestions { display: none; position: absolute; top: 100%; width: 100%; max-width: 500px; background-color: #2c2c2c; border: 1px solid #444; border-top: none; border-radius: 0 0 20px 20px; z-index: 100; max-height: 220px; overflow-y: auto; }
+        .suggestion-item { display: flex; align-items: center; gap: 15px; padding: 10px 20px; cursor: pointer; color: #e0e0e0; }
+        .suggestion-item img { width: 40px; height: 40px; border-radius: 5px; object-fit: cover; }
+        .suggestion-item:hover { background-color: #3d3d3d; }
+
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 25px; }
+        .product-card { background-color: #1f1f1f; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s; border: 1px solid #333; position: relative; }
+        .product-card:hover { transform: translateY(-5px); }
+        .product-card img.product-image { width: 100%; height: 200px; object-fit: cover; background-color: #2c2c2c; }
+        .product-info { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; text-align: center; }
+        .product-info h3 { margin: 0 0 5px 0; font-size: 18px; color: #ffffff; }
+        .product-price { font-size: 22px; font-weight: bold; color: #ffffff; }
+        .product-quantity { font-size: 14px; color: #a0a0a0; margin: 5px 0 15px 0; }
+        
+        .buy-button-wrapper { 
+            padding: 15px; 
+            border-top: 1px solid #333; 
+            margin-top: auto; 
+            display: flex;
+            gap: 10px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 12px 5px;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            font-weight: 700;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .add-to-cart-btn { background-color: #ffab4c; color: #121212; }
+        .add-to-cart-btn:hover { background-color: #e69a45; }
+        .buy-now-btn { background-color: #28a745; }
+        .buy-now-btn:hover { background-color: #218838; }
+        
+        .empty-store, .no-results { text-align: center; padding: 50px; background-color: #1f1f1f; border-radius: 10px; grid-column: 1 / -1; }
+        .no-results { display: none; }
+        .alert { padding: 15px; margin-bottom: 20px; border-radius: 5px; text-align: center; color: #121212; background-color: #ffab4c; }
+        .favorite-toggle { background: none; border: none; cursor: pointer; font-size: 24px; padding: 5px; position: absolute; top: 10px; right: 10px; z-index: 10;}
+        .favorite-toggle.is-favorite { color: #e74c3c; }
+        .favorite-toggle.not-favorite { color: #555; }
+        h2.section-title { color: #ffab4c; border-bottom: 2px solid #ffab4c; padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
+        hr { border: none; height: 1px; background-color: #333; margin: 40px 0; }
+    </style>
+</head>
+<body>
+    <div class="overlay" onclick="closeNav()"></div>
+
+    <aside class="sidebar" id="mySidebar">
+        <button class="close-btn" onclick="closeNav()">&times;</button>
+        <div class="sidebar-links">
+            <a href="{{ url_for('ver_carrinho') }}">Meu Carrinho</a>
+            <a href="{{ url_for('meu_historico') }}">Meu Histórico</a>
+            <a href="{{ url_for('meu_perfil') }}">Minha Conta</a>
+            <form action="{{ url_for('update_my_condo') }}" method="POST" class="condo-changer-form">
+                <label>Mudar de condomínio:</label>
+                <select name="new_condo_name">
+                    {% for condo in todos_condominios %}<option value="{{ condo.name }}" {% if condo.name == current_user.condominio_name %}selected{% endif %}>{{ condo.name }}</option>{% endfor %}
+                </select>
+                <button type="submit">Mudar</button>
+            </form>
+            <a href="{{ url_for('logout') }}" class="logout-link">Sair</a>
+        </div>
+    </aside>
+
+    <nav class="navbar">
+        <img src="{{ url_for('static', filename='logo-smartbox.png') }}" alt="SmartBOX Logo" class="logo">
+        <div class="nav-actions">
+            <a href="{{ url_for('ver_carrinho') }}" class="cart-icon">
+                🛒<span class="cart-badge" id="cart-badge">{{ session.get('cart', {})|length }}</span>
+            </a>
+            <button class="hamburger-menu" onclick="openNav()">
+                <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}<div class="alert alert-{{ 'danger' if category == 'error' else 'success' }}">{{ message }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+        
+        <div class="page-header">
+            <h1>Olá, {{ current_user.full_name.split(' ')[0] }}!</h1>
+            <p class="location-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-geo-alt-fill" viewBox="0 0 16 16"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+                A ver produtos em: <strong>{{ current_user.condominio_name }}</strong>
+            </p>
+            <div class="search-wrapper">
+                <div class="search-container">
+                    <input type="text" id="searchInput" onkeyup="handleSearch()" placeholder="Pesquisar produtos...">
+                    <div id="suggestions-list" class="suggestions"></div>
+                </div>
+            </div>
+        </div>
+
+        {% if current_user.favorite_products.all() %}
+            <h2 class="section-title">Meus Favoritos</h2>
+            <div class="product-grid" id="favorites-grid">
+                {% for product in current_user.favorite_products %}
+                    {% set inventory_item = products_in_condo | selectattr('product_id', 'equalto', product.id) | first %}
+                    {% if inventory_item and inventory_item.quantity > 0 %}
+                    <div class="product-card">
+                        <button class="favorite-toggle is-favorite" onclick="toggleFavorite(this, {{ product.id }})">♥</button>
+                        <img src="{{ product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ product.name }}" class="product-image">
+                        <div class="product-info">
+                            <h3>{{ product.name }}</h3>
+                            <p class="product-quantity">{{ inventory_item.quantity }} unidades disponíveis</p>
+                            <p class="product-price">R$ {{ "%.2f"|format(product.sell_price) }}</p>
+                        </div>
+                        <div class="buy-button-wrapper">
+                            <button class="action-btn add-to-cart-btn" onclick="addToCart({{ inventory_item.id }})">Adicionar</button>
+                            <button class="action-btn buy-now-btn" onclick="buyNow({{ inventory_item.id }})">Comprar</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <hr>
+        {% endif %}
+
+        <h2 class="section-title">Todos os Produtos</h2>
+        {% if products_in_condo %}
+            <div class="product-grid" id="all-products-grid">
+                {% for item in products_in_condo %}
+                <div class="product-card">
+                    <button class="favorite-toggle {% if item.product.id in favorite_ids %}is-favorite{% else %}not-favorite{% endif %}" onclick="toggleFavorite(this, {{ item.product.id }})">♥</button>
+                    <img src="{{ item.product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ item.product.name }}" class="product-image">
+                    <div class="product-info">
+                        <h3>{{ item.product.name }}</h3>
+                        <p class="product-quantity">{{ item.quantity }} unidades disponíveis</p>
+                        <p class="product-price">R$ {{ "%.2f"|format(item.product.sell_price) }}</p>
+                    </div>
+                    <div class="buy-button-wrapper">
+                        <button class="action-btn add-to-cart-btn" onclick="addToCart({{ item.id }})">Adicionar</button>
+                        <button class="action-btn buy-now-btn" onclick="buyNow({{ item.id }})">Comprar</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-store"><h2>Ops!</h2><p>A geladeira do seu condomínio está vazia.</p></div>
+        {% endif %}
+    </div>
+
+    <script>
+        function openNav() { document.body.classList.add('sidebar-open'); }
+        function closeNav() { document.body.classList.remove('sidebar-open'); }
+
+        async function toggleFavorite(button, productId) {
+            const response = await fetch(`/toggle_favorite/${productId}`, { method: 'POST' });
+            if (response.ok) window.location.reload();
+        }
+
+        async function addToCart(inventoryId) {
+            const response = await fetch(`/adicionar_carrinho/${inventoryId}`, { method: 'POST' });
+            const data = await response.json();
+            if (data.status === 'ok') {
+                document.getElementById('cart-badge').innerText = data.cart_item_count;
+            } else { alert(data.message); }
+        }
+
+        async function buyNow(inventoryId) {
+            const response = await fetch(`/adicionar_carrinho/${inventoryId}`, { method: 'POST' });
+            const data = await response.json();
+            if (data.status === 'ok' || data.message.includes('insuficiente')) {
+                 window.location.href = "{{ url_for('ver_carrinho') }}";
+            } else { alert(data.message); }
+        }
+
+        // --- LÓGICA DA PESQUISA COM SUGESTÕES ---
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsContainer = document.getElementById('suggestions-list');
+        
+        const allProductsData = [
+            {% for item in products_in_condo %}
+                { name: `{{ item.product.name | e }}`, imageUrl: `{{ item.product.image_url or 'https://placehold.co/40x40/2c2c2c/cccccc?text=?' }}` },
+            {% endfor %}
+        ];
+
+        function handleSearch() {
+            const filter = searchInput.value.toUpperCase();
+            
+            suggestionsContainer.innerHTML = '';
+            if (filter.length > 0) {
+                const filteredProducts = allProductsData.filter(product => product.name.toUpperCase().includes(filter));
+                if(filteredProducts.length > 0){
+                    filteredProducts.forEach(product => {
+                        const suggestionItem = document.createElement('div');
+                        suggestionItem.classList.add('suggestion-item');
+                        suggestionItem.innerHTML = `<img src="${product.imageUrl}" alt="${product.name}"><span>${product.name}</span>`;
+                        suggestionItem.onclick = () => {
+                            searchInput.value = product.name;
+                            suggestionsContainer.style.display = 'none';
+                            filterProducts();
+                        };
+                        suggestionsContainer.appendChild(suggestionItem);
+                    });
+                    suggestionsContainer.style.display = 'block';
+                } else { suggestionsContainer.style.display = 'none'; }
+            } else { suggestionsContainer.style.display = 'none'; }
+            filterProducts();
+        }
+        
+        function filterProducts() {
+            const filter = searchInput.value.toUpperCase();
+            const grids = document.querySelectorAll('.product-grid');
+            let totalVisible = 0;
+            grids.forEach(grid => {
+                const cards = grid.getElementsByClassName('product-card');
+                for (let i = 0; i < cards.length; i++) {
+                    const h3 = cards[i].getElementsByTagName("h3")[0];
+                    if (h3) {
+                        const txtValue = h3.textContent || h3.innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            cards[i].style.display = ""; totalVisible++;
+                        } else { cards[i].style.display = "none"; }
+                    }
+                }
+            });
+            const noResultsMessage = document.querySelector('.no-results');
+            if (totalVisible === 0 && filter.length > 0) {
+                if(!noResultsMessage) {
+                    const grid = document.getElementById('all-products-grid');
+                    const msg = document.createElement('div');
+                    msg.className = 'no-results';
+                    msg.innerHTML = '<h2>Nenhum resultado encontrado</h2><p>Tente pesquisar por outro produto.</p>';
+                    grid.appendChild(msg);
+                }
+                document.querySelector('.no-results').style.display = 'block';
+            } else if(noResultsMessage) {
+                noResultsMessage.style.display = 'none';
+            }
+        }
+        document.addEventListener('click', function(event) {
+            const isClickInside = suggestionsContainer.contains(event.target) || searchInput.contains(event.target);
+            if (!isClickInside) { suggestionsContainer.style.display = 'none'; }
+        });
+    </script>
+</body>
+</html>

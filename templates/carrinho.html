@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Carrinho - SmartBOX</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #121212; margin: 0; color: #e0e0e0; }
+        .navbar { background-color: #1f1f1f; padding: 10px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; }
+        .navbar .logo { height: 60px; }
+        .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        h1 { color: #ffab4c; border-bottom: 1px solid #444; padding-bottom: 15px; }
+        
+        .cart-item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 20px; padding: 20px 0; border-bottom: 1px solid #333; align-items: center; }
+        .cart-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
+        .item-details h3 { margin: 0 0 5px 0; color: #fff; }
+        .item-price { color: #a0a0a0; }
+
+        .item-quantity { display: flex; align-items: center; justify-content: center; background-color: #2c2c2c; border-radius: 8px; border: 1px solid #444; overflow: hidden; }
+        .item-quantity button { font-size: 20px; width: 40px; height: 40px; border: none; background-color: transparent; color: #ffab4c; cursor: pointer; }
+        .item-quantity input { width: 40px; height: 40px; text-align: center; font-size: 16px; border: none; background: transparent; color: #fff; -moz-appearance: textfield; }
+        .item-quantity input::-webkit-outer-spin-button, .item-quantity input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .item-subtotal { font-size: 1.2rem; font-weight: bold; min-width: 100px; text-align: right; }
+        .remove-btn { background-color: #555; color: #fff; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+
+        .cart-summary { margin-top: 30px; padding: 20px; background-color: #1f1f1f; border: 1px solid #333; border-radius: 10px; text-align: right; }
+        .cart-summary h2 { margin: 0; font-size: 1.8rem; }
+        .cart-summary h2 span { color: #ffab4c; }
+
+        .payment-options { display: flex; gap: 15px; justify-content: flex-end; margin-top: 20px; }
+        .payment-button { padding: 15px 30px; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; }
+        .pix-btn { background-color: #28a745; }
+        .card-btn { background-color: #ffab4c; color: #121212; }
+        
+        .empty-cart, .back-to-shop { text-align: center; padding: 50px; background-color: #1f1f1f; border-radius: 10px; }
+        .back-to-shop a, .empty-cart a { color: #ffab4c; font-weight: 600; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('user_dashboard') }}"><img src="{{ url_for('static', filename='logo-smartbox.png') }}" alt="SmartBOX Logo" class="logo"></a>
+    </nav>
+    <div class="container">
+        <h1>Meu Carrinho</h1>
+        <div class="back-to-shop" style="text-align: left; padding: 0 0 20px 0; background: none;">
+            <a href="{{ url_for('user_dashboard') }}">&larr; Voltar à loja</a>
+        </div>
+
+        {% if not cart_items %}
+            <div class="empty-cart">
+                <h2>O seu carrinho está vazio.</h2>
+            </div>
+        {% else %}
+            <div class="cart-list">
+                {% for item in cart_items %}
+                <div class="cart-item" data-item-id="{{ item.id }}" data-unit-price="{{ item.product.sell_price }}">
+                    <img src="{{ item.product.image_url or 'https://placehold.co/80x80/2c2c2c/cccccc?text=?' }}" alt="{{ item.product.name }}">
+                    <div class="item-details">
+                        <h3>{{ item.product.name }}</h3>
+                        <span class="item-price">R$ {{ "%.2f"|format(item.product.sell_price) }}</span>
+                    </div>
+                    <div class="item-quantity">
+                        <button class="quantity-change" data-change="-1">-</button>
+                        <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.max_quantity }}" class="quantity-input">
+                        <button class="quantity-change" data-change="1">+</button>
+                    </div>
+                    <div class="item-subtotal">R$ {{ "%.2f"|format(item.subtotal) }}</div>
+                    <form action="{{ url_for('remover_do_carrinho') }}" method="POST">
+                        <input type="hidden" name="inventory_id" value="{{ item.id }}">
+                        <button type="submit" class="remove-btn">X</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="cart-summary">
+                <h2>Total: <span id="total-geral">R$ {{ "%.2f"|format(total_geral) }}</span></h2>
+                <div class="payment-options">
+                    <a href="{{ url_for('finalizar_compra', method='card') }}" class="payment-button card-btn">Pagar com Cartão</a>
+                    <a href="{{ url_for('finalizar_compra', method='pix') }}" class="payment-button pix-btn">Pagar com PIX</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Função para atualizar o servidor via Fetch API
+            async function updateCart(itemId, newQuantity) {
+                const formData = new FormData();
+                formData.append('inventory_id', itemId);
+                formData.append('quantity', newQuantity);
+
+                // Não precisamos de tratar a resposta, a página irá recarregar ou o subtotal será atualizado
+                await fetch("{{ url_for('atualizar_carrinho') }}", {
+                    method: 'POST',
+                    body: formData
+                });
+            }
+
+            // Função para recalcular os totais na página
+            function recalculateTotals() {
+                let totalGeral = 0;
+                document.querySelectorAll('.cart-item').forEach(itemRow => {
+                    const unitPrice = parseFloat(itemRow.dataset.unitPrice);
+                    const quantity = parseInt(itemRow.querySelector('.quantity-input').value);
+                    const subtotal = unitPrice * quantity;
+                    itemRow.querySelector('.item-subtotal').innerText = `R$ ${subtotal.toFixed(2)}`;
+                    totalGeral += subtotal;
+                });
+                document.getElementById('total-geral').innerText = `R$ ${totalGeral.toFixed(2)}`;
+            }
+
+            // Adiciona listeners para os botões +/-
+            document.querySelectorAll('.quantity-change').forEach(button => {
+                button.addEventListener('click', function() {
+                    const itemRow = this.closest('.cart-item');
+                    const input = itemRow.querySelector('.quantity-input');
+                    const change = parseInt(this.dataset.change);
+                    let newQuantity = parseInt(input.value) + change;
+                    const maxQuantity = parseInt(input.max);
+
+                    if (newQuantity < 1) newQuantity = 1;
+                    if (newQuantity > maxQuantity) newQuantity = maxQuantity;
+                    
+                    input.value = newQuantity;
+                    recalculateTotals();
+                    updateCart(itemRow.dataset.itemId, newQuantity); // Atualiza no backend
+                });
+            });
+
+            // Adiciona listener para a mudança manual no input
+            document.querySelectorAll('.quantity-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const itemRow = this.closest('.cart-item');
+                    const newQuantity = parseInt(this.value);
+                    recalculateTotals();
+                    updateCart(itemRow.dataset.itemId, newQuantity); // Atualiza no backend
+                });
+            });
+        });
+    </script>
+</body>
+</html>

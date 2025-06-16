@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerir Condomínios - SmartBOX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-header"><h3 class="logo-text">SmartBOX Admin</h3></div>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}" class="active">Condomínios</a></li>
+                <li><a href="{{ url_for('selecionar_geladeira') }}">Gerir Geladeiras</a></li>
+                <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
+                <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
+                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <h1>Gerir Condomínios</h1>
+            <div class="card">
+                <h2>Adicionar Novo Condomínio</h2>
+                <form action="{{ url_for('gerenciar_condominios') }}" method="POST">
+                    <div class="form-group"><label>Nome do Condomínio</label><input type="text" name="condo_name" required></div>
+                    <div class="form-group"><label>Nome do Responsável</label><input type="text" name="responsible_name"></div>
+                    <button type="submit">Adicionar Condomínio</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>Condomínios Registados</h2>
+                <table>
+                    <thead><tr><th>Nome</th><th>Responsável</th><th>Ações</th></tr></thead>
+                    <tbody>
+                        {% for condo in condominios %}
+                        <tr>
+                            <td>{{ condo.name }}</td>
+                            <td>{{ condo.responsible_name or 'N/A' }}</td>
+                            <td>
+                                <form action="{{ url_for('excluir_condominio', condo_id=condo.id) }}" method="POST" onsubmit="return confirm('Tem a certeza?');" class="inline-form">
+                                    <button type="submit" class="delete-btn">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerir Catálogo Global - SmartBOX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
+</head>
+<body>
+    <div class="wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-header"><h3 class="logo-text">SmartBOX Admin</h3></div>
+            <ul>
+                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
+                <li><a href="{{ url_for('selecionar_geladeira') }}">Gerir Geladeiras</a></li>
+                <li><a href="{{ url_for('gerenciar_catalogo') }}" class="active">Catálogo Global</a></li>
+                <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
+                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <h1>Catálogo Global</h1>
+            <div class="card">
+                <h2>Adicionar Produto ao Catálogo</h2>
+                <form action="{{ url_for('gerenciar_catalogo') }}" method="POST">
+                    <div class="form-group"><label>Nome do Produto</label><input type="text" name="product_name" required></div>
+                    <div class="form-group"><label>Preço de Custo</label><input type="number" step="0.01" name="cost_price" required></div>
+                    <div class="form-group"><label>Preço de Venda</label><input type="number" step="0.01" name="sell_price" required></div>
+                    <div class="form-group"><label>URL da Imagem</label><input type="text" name="image_url"></div>
+                    <button type="submit">Adicionar</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>Produtos no Catálogo</h2>
+                <table>
+                    <thead><tr><th>Produto</th><th>Custo</th><th>Venda</th><th>Ações</th></tr></thead>
+                    <tbody>
+                        {% for product in produtos %}
+                        <tr>
+                            <td>{{ product.name }}</td>
+                            <td>R$ {{ "%.2f"|format(product.cost_price|float) }}</td>
+                            <td>R$ {{ "%.2f"|format(product.sell_price|float) }}</td>
+                            <td>
+                                <form action="{{ url_for('excluir_produto_catalogo', product_id=product.id) }}" method="POST" onsubmit="return confirm('Tem a certeza?');" class="inline-form">
+                                    <button type="submit" class="delete-btn">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

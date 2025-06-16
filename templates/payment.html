@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagar com PIX - SmartBOX</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #121212; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; color: #e0e0e0;}
+        .payment-box { background: #1f1f1f; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; border: 1px solid #333; }
+        h2 { color: #fff; }
+        img { max-width: 250px; margin: 20px auto; display: block; border: 1px solid #ddd; border-radius: 8px;}
+        .pix-code { word-wrap: break-word; background: #2c2c2c; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 14px; margin-top: 10px; text-align: left;}
+        #status-text { margin-top: 20px; font-weight: bold; font-size: 18px; color: #ffab4c; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #ffab4c; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto 0 auto;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="payment-box">
+        <h2>Pague com PIX para liberar</h2>
+        <p>Aponte a câmara do seu telemóvel para o QR Code abaixo.</p>
+        <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="PIX QR Code">
+        <p>Ou use o código "Copia e Cola":</p>
+        <div class="pix-code">{{ qr_code }}</div>
+        <div class="spinner"></div>
+        <p id="status-text">Aguardando pagamento...</p>
+    </div>
+    <script>
+        const salePaymentId = "{{ sale_payment_id }}";
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch(`/check_payment_status/${salePaymentId}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.status === 'paid') {
+                    clearInterval(interval);
+                    // Redireciona para a nova página de sucesso com o QR Code de acesso
+                    window.location.href = `/pagamento_aprovado/${data.order_id}`;
+                }
+            } catch (error) {
+                console.error("Erro ao verificar estado:", error);
+            }
+        }, 3000); // Verifica a cada 3 segundos
+    </script>
+</body>
+</html>
