@@ -9,20 +9,19 @@
     <div class="wrapper">
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h3 class="logo-text">SmartBOX Admin</h3>
+                <h3 class="logo-text">Smart Fridge Admin</h3>
             </div>
             <ul>
-                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <!-- MENU CORRIGIDO E SIMPLIFICADO -->
                 <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
                 <li><a href="{{ url_for('selecionar_geladeira') }}" class="active">Gerir Geladeiras</a></li>
                 <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
                 <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
-                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
                 <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
             </ul>
         </nav>
         <main class="main-content">
-            <a href="{{ url_for('selecionar_geladeira') }}" class="back-link">&larr; Voltar para a seleção</a>
+            <a href="{{ url_for('selecionar_geladeira') }}" class="back-link">&larr; Voltar para a seleção de condomínios</a>
             <h1>A Gerir: Geladeira do <strong>{{ condo.name }}</strong></h1>
             
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -60,7 +59,7 @@
                         <tr>
                             <th>Produto</th>
                             <th>Quantidade Atual</th>
-                            <th style="width: 250px;">Ações</th>
+                            <th style="width: 40%;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -76,7 +75,7 @@
                                 </form>
                             </td>
                             <td>
-                                <form method="POST" class="inline-form" onsubmit="return confirm('Tem a certeza?');">
+                                <form method="POST" class="inline-form" onsubmit="return confirm('Tem a certeza que quer remover este item da geladeira?');">
                                     <input type="hidden" name="action" value="remove_item">
                                     <input type="hidden" name="inventory_id" value="{{ item.id }}">
                                     <button type="submit" class="delete-btn">Remover</button>

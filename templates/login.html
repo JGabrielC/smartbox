@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - SmartBOX</title>
+    <title>Login - Smart Fridge Brasil</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
@@ -14,7 +14,7 @@
         }
 
         body { 
-            background-color: #121212; 
+            background-color: #000000; /* Fundo mais preto */
             display: flex; 
             justify-content: center; 
             align-items: center; 
@@ -35,11 +35,11 @@
 
         .logo-wrapper {
             text-align: center;
-            margin-bottom: 30px; /* Espaço ajustado entre a logo e o formulário */
+            margin-bottom: 30px; 
         }
 
         .logo { 
-            height: 120px; /* Tamanho ajustado para um visual mais equilibrado */
+            height: 120px; /* Tamanho equilibrado para a logo */
             width: auto; 
         }
 
@@ -145,5 +145,15 @@
             <p>Não tem uma conta? <a href="{{ url_for('cadastro') }}">Registe-se</a></p>
         </div>
     </div>
+
+    <!-- SCRIPT ADICIONADO PARA A MÁSCARA DO CPF -->
+    <script src="https://unpkg.com/imask"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const cpfElement = document.getElementById('cpf');
+            const cpfMask = { mask: '000.000.000-00' };
+            IMask(cpfElement, cpfMask);
+        });
+    </script>
 </body>
 </html>

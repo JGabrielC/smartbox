@@ -19,11 +19,17 @@
             position: sticky; top: 0; z-index: 998;
         }
         .navbar .logo {
-            grid-column: 1; justify-self: start; height: 100px; width: auto;
+            grid-column: 2; justify-self: center; height: 100px; width: auto;
         }
         .navbar .nav-actions {
             grid-column: 3; justify-self: end;
             display: flex; align-items: center; gap: 25px;
+        }
+        .hamburger-menu {
+            display: block;
+            background: none; border: none; cursor: pointer; padding: 10px;
+            grid-column: 1;
+            justify-self: start;
         }
         .navbar .cart-icon {
             color: #e0e0e0; text-decoration: none;
@@ -34,10 +40,6 @@
             background-color: #ffab4c; color: #121212;
             border-radius: 50%; padding: 2px 6px;
             font-size: 12px; font-weight: bold;
-        }
-        .hamburger-menu {
-            display: block;
-            background: none; border: none; cursor: pointer; padding: 10px;
         }
         .hamburger-menu .bar {
             display: block; width: 25px; height: 3px; margin: 5px auto;
@@ -112,26 +114,8 @@
         .product-price { font-size: 22px; font-weight: bold; color: #ffffff; }
         .product-quantity { font-size: 14px; color: #a0a0a0; margin: 5px 0 15px 0; }
         
-        .buy-button-wrapper { 
-            padding: 15px; 
-            border-top: 1px solid #333; 
-            margin-top: auto; 
-            display: flex;
-            gap: 10px;
-        }
-        .action-btn {
-            flex: 1;
-            padding: 12px 5px;
-            color: white;
-            text-align: center;
-            text-decoration: none;
-            font-weight: 700;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
+        .buy-button-wrapper { padding: 15px; border-top: 1px solid #333; margin-top: auto; display: flex; gap: 10px; }
+        .action-btn { flex: 1; padding: 12px 5px; color: white; text-align: center; text-decoration: none; font-weight: 700; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; transition: background-color 0.2s; }
         .add-to-cart-btn { background-color: #ffab4c; color: #121212; }
         .add-to-cart-btn:hover { background-color: #e69a45; }
         .buy-now-btn { background-color: #28a745; }
@@ -145,16 +129,22 @@
         .favorite-toggle.not-favorite { color: #555; }
         h2.section-title { color: #ffab4c; border-bottom: 2px solid #ffab4c; padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
         hr { border: none; height: 1px; background-color: #333; margin: 40px 0; }
+        
+        .popup { visibility: hidden; position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background-color: #28a745; color: white; padding: 15px 25px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1001; opacity: 0; transition: opacity 0.4s, top 0.4s; }
+        .popup.show { visibility: visible; top: 50px; opacity: 1; }
+        .popup-content { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .popup-icon { font-size: 20px; }
     </style>
 </head>
 <body>
     <div class="overlay" onclick="closeNav()"></div>
-
+    <div id="popup-notification" class="popup">
+        <div class="popup-content"><span class="popup-icon">✓</span><span>Produto adicionado ao carrinho!</span></div>
+    </div>
     <aside class="sidebar" id="mySidebar">
         <button class="close-btn" onclick="closeNav()">&times;</button>
         <div class="sidebar-links">
             <a href="{{ url_for('ver_carrinho') }}">Meu Carrinho</a>
-            <a href="{{ url_for('meu_historico') }}">Meu Histórico</a>
             <a href="{{ url_for('meu_perfil') }}">Minha Conta</a>
             <form action="{{ url_for('update_my_condo') }}" method="POST" class="condo-changer-form">
                 <label>Mudar de condomínio:</label>
@@ -203,20 +193,24 @@
             <div class="product-grid" id="favorites-grid">
                 {% for product in current_user.favorite_products %}
                     {% set inventory_item = products_in_condo | selectattr('product_id', 'equalto', product.id) | first %}
-                    {% if inventory_item and inventory_item.quantity > 0 %}
-                    <div class="product-card">
-                        <button class="favorite-toggle is-favorite" onclick="toggleFavorite(this, {{ product.id }})">♥</button>
-                        <img src="{{ product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ product.name }}" class="product-image">
-                        <div class="product-info">
-                            <h3>{{ product.name }}</h3>
-                            <p class="product-quantity">{{ inventory_item.quantity }} unidades disponíveis</p>
-                            <p class="product-price">R$ {{ "%.2f"|format(product.sell_price) }}</p>
+                    {% if inventory_item %}
+                        {% set in_cart_quantity = session.get('cart', {}).get(inventory_item.id|string, 0) %}
+                        {% set effective_stock = inventory_item.quantity - in_cart_quantity %}
+                        {% if effective_stock > 0 %}
+                        <div class="product-card" data-inventory-id="{{ inventory_item.id }}">
+                            <button class="favorite-toggle is-favorite" onclick="toggleFavorite(this, {{ product.id }})">♥</button>
+                            <img src="{{ product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ product.name }}" class="product-image">
+                            <div class="product-info">
+                                <h3>{{ product.name }}</h3>
+                                <p class="product-quantity">{{ effective_stock }} unidades disponíveis</p>
+                                <p class="product-price">R$ {{ "%.2f"|format(product.sell_price) }}</p>
+                            </div>
+                            <div class="buy-button-wrapper">
+                                <button class="action-btn add-to-cart-btn" onclick="handleAddToCart({{ inventory_item.id }}, false)">Adicionar</button>
+                                <button class="action-btn buy-now-btn" onclick="handleAddToCart({{ inventory_item.id }}, true)">Comprar</button>
+                            </div>
                         </div>
-                        <div class="buy-button-wrapper">
-                            <button class="action-btn add-to-cart-btn" onclick="addToCart({{ inventory_item.id }})">Adicionar</button>
-                            <button class="action-btn buy-now-btn" onclick="buyNow({{ inventory_item.id }})">Comprar</button>
-                        </div>
-                    </div>
+                        {% endif %}
                     {% endif %}
                 {% endfor %}
             </div>
@@ -227,19 +221,23 @@
         {% if products_in_condo %}
             <div class="product-grid" id="all-products-grid">
                 {% for item in products_in_condo %}
-                <div class="product-card">
-                    <button class="favorite-toggle {% if item.product.id in favorite_ids %}is-favorite{% else %}not-favorite{% endif %}" onclick="toggleFavorite(this, {{ item.product.id }})">♥</button>
-                    <img src="{{ item.product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ item.product.name }}" class="product-image">
-                    <div class="product-info">
-                        <h3>{{ item.product.name }}</h3>
-                        <p class="product-quantity">{{ item.quantity }} unidades disponíveis</p>
-                        <p class="product-price">R$ {{ "%.2f"|format(item.product.sell_price) }}</p>
+                    {% set in_cart_quantity = session.get('cart', {}).get(item.id|string, 0) %}
+                    {% set effective_stock = item.quantity - in_cart_quantity %}
+                    {% if effective_stock > 0 %}
+                    <div class="product-card" data-inventory-id="{{ item.id }}">
+                        <button class="favorite-toggle {% if item.product.id in favorite_ids %}is-favorite{% else %}not-favorite{% endif %}" onclick="toggleFavorite(this, {{ item.product.id }})">♥</button>
+                        <img src="{{ item.product.image_url or 'https://placehold.co/400x400/2c2c2c/cccccc?text=Produto' }}" alt="{{ item.product.name }}" class="product-image">
+                        <div class="product-info">
+                            <h3>{{ item.product.name }}</h3>
+                            <p class="product-quantity">{{ effective_stock }} unidades disponíveis</p>
+                            <p class="product-price">R$ {{ "%.2f"|format(item.product.sell_price) }}</p>
+                        </div>
+                        <div class="buy-button-wrapper">
+                            <button class="action-btn add-to-cart-btn" onclick="handleAddToCart({{ item.id }}, false)">Adicionar</button>
+                            <button class="action-btn buy-now-btn" onclick="handleAddToCart({{ item.id }}, true)">Comprar</button>
+                        </div>
                     </div>
-                    <div class="buy-button-wrapper">
-                        <button class="action-btn add-to-cart-btn" onclick="addToCart({{ item.id }})">Adicionar</button>
-                        <button class="action-btn buy-now-btn" onclick="buyNow({{ item.id }})">Comprar</button>
-                    </div>
-                </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% else %}
@@ -255,36 +253,57 @@
             const response = await fetch(`/toggle_favorite/${productId}`, { method: 'POST' });
             if (response.ok) window.location.reload();
         }
-
-        async function addToCart(inventoryId) {
+        
+        // --- LÓGICA DE ATUALIZAÇÃO E PESQUISA CORRIGIDA ---
+        
+        async function handleAddToCart(inventoryId, redirectToCart) {
             const response = await fetch(`/adicionar_carrinho/${inventoryId}`, { method: 'POST' });
             const data = await response.json();
+            
             if (data.status === 'ok') {
                 document.getElementById('cart-badge').innerText = data.cart_item_count;
-            } else { alert(data.message); }
-        }
 
-        async function buyNow(inventoryId) {
-            const response = await fetch(`/adicionar_carrinho/${inventoryId}`, { method: 'POST' });
-            const data = await response.json();
-            if (data.status === 'ok' || data.message.includes('insuficiente')) {
-                 window.location.href = "{{ url_for('ver_carrinho') }}";
-            } else { alert(data.message); }
+                const productCards = document.querySelectorAll(`.product-card[data-inventory-id='${inventoryId}']`);
+                productCards.forEach(card => {
+                    const quantityElement = card.querySelector('.product-quantity');
+                    if (quantityElement) {
+                        let currentStock = parseInt(quantityElement.innerText.split(' ')[0]);
+                        if (!isNaN(currentStock) && currentStock > 0) {
+                            currentStock--;
+                            quantityElement.innerText = `${currentStock} unidades disponíveis`;
+                            if (currentStock === 0) {
+                                card.style.display = 'none';
+                            }
+                        }
+                    }
+                });
+                
+                if (redirectToCart) {
+                    window.location.href = "{{ url_for('ver_carrinho') }}";
+                } else {
+                    const popup = document.getElementById('popup-notification');
+                    popup.classList.add('show');
+                    setTimeout(() => popup.classList.remove('show'), 2000);
+                }
+            } else { 
+                alert(data.message); 
+            }
         }
-
-        // --- LÓGICA DA PESQUISA COM SUGESTÕES ---
+        
         const searchInput = document.getElementById('searchInput');
         const suggestionsContainer = document.getElementById('suggestions-list');
-        
         const allProductsData = [
             {% for item in products_in_condo %}
-                { name: `{{ item.product.name | e }}`, imageUrl: `{{ item.product.image_url or 'https://placehold.co/40x40/2c2c2c/cccccc?text=?' }}` },
+                {% set in_cart_quantity = session.get('cart', {}).get(item.id|string, 0) %}
+                {% set effective_stock = item.quantity - in_cart_quantity %}
+                {% if effective_stock > 0 %}
+                    { name: `{{ item.product.name | escape }}`, imageUrl: `{{ item.product.image_url or 'https://placehold.co/40x40/2c2c2c/cccccc?text=?' }}` },
+                {% endif %}
             {% endfor %}
         ];
 
         function handleSearch() {
             const filter = searchInput.value.toUpperCase();
-            
             suggestionsContainer.innerHTML = '';
             if (filter.length > 0) {
                 const filteredProducts = allProductsData.filter(product => product.name.toUpperCase().includes(filter));
@@ -305,11 +324,10 @@
             } else { suggestionsContainer.style.display = 'none'; }
             filterProducts();
         }
-        
+
         function filterProducts() {
             const filter = searchInput.value.toUpperCase();
             const grids = document.querySelectorAll('.product-grid');
-            let totalVisible = 0;
             grids.forEach(grid => {
                 const cards = grid.getElementsByClassName('product-card');
                 for (let i = 0; i < cards.length; i++) {
@@ -317,24 +335,13 @@
                     if (h3) {
                         const txtValue = h3.textContent || h3.innerText;
                         if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                            cards[i].style.display = ""; totalVisible++;
-                        } else { cards[i].style.display = "none"; }
+                            cards[i].style.display = "";
+                        } else {
+                            cards[i].style.display = "none";
+                        }
                     }
                 }
             });
-            const noResultsMessage = document.querySelector('.no-results');
-            if (totalVisible === 0 && filter.length > 0) {
-                if(!noResultsMessage) {
-                    const grid = document.getElementById('all-products-grid');
-                    const msg = document.createElement('div');
-                    msg.className = 'no-results';
-                    msg.innerHTML = '<h2>Nenhum resultado encontrado</h2><p>Tente pesquisar por outro produto.</p>';
-                    grid.appendChild(msg);
-                }
-                document.querySelector('.no-results').style.display = 'block';
-            } else if(noResultsMessage) {
-                noResultsMessage.style.display = 'none';
-            }
         }
         document.addEventListener('click', function(event) {
             const isClickInside = suggestionsContainer.contains(event.target) || searchInput.contains(event.target);

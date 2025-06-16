@@ -134,7 +134,7 @@
                 </div>
                 <div class="form-group">
                     <label>CPF</label>
-                    <input type="text" name="cpf" required>
+                    <input type="text" id="cpf" name="cpf" required>
                 </div>
                 <div class="form-group">
                     <label>Data de Nascimento</label>
@@ -164,5 +164,14 @@
             </div>
         </div>
     </div>
+    <!-- SCRIPT ADICIONADO PARA A MÁSCARA DO CPF -->
+    <script src="https://unpkg.com/imask"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const cpfElement = document.getElementById('cpf');
+            const cpfMask = { mask: '000.000.000-00' };
+            IMask(cpfElement, cpfMask);
+        });
+    </script>
 </body>
 </html>

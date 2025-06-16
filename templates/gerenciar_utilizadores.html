@@ -2,22 +2,21 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Gestão de Utilizadores - SmartBOX</title>
+    <title>Gestão de Utilizadores - Smart Fridge Brasil</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
 </head>
 <body>
     <div class="wrapper">
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h3 class="logo-text">SmartBOX Admin</h3>
+                <h3 class="logo-text">Smart Fridge Admin</h3>
             </div>
             <ul>
-                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                <!-- MENU CORRIGIDO E SIMPLIFICADO -->
                 <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
                 <li><a href="{{ url_for('selecionar_geladeira') }}">Gerir Geladeiras</a></li>
                 <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
                 <li><a href="{{ url_for('gerenciar_utilizadores') }}" class="active">Gestão de Utilizadores</a></li>
-                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
                 <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
             </ul>
         </nav>

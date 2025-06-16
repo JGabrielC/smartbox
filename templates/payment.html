@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pagar com PIX - SmartBOX</title>
+    <title>Pagar com PIX - Smart Fridge Brasil</title>
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #121212; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; color: #e0e0e0;}
         .payment-box { background: #1f1f1f; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); width: 100%; max-width: 400px; text-align: center; border: 1px solid #333; }
@@ -31,16 +31,19 @@
             try {
                 const response = await fetch(`/check_payment_status/${salePaymentId}`);
                 if (!response.ok) return;
+                
                 const data = await response.json();
+                
                 if (data.status === 'paid') {
                     clearInterval(interval);
+                    document.getElementById('status-text').innerText = 'Pagamento Aprovado! A redirecionar...';
                     // Redireciona para a nova página de sucesso com o QR Code de acesso
                     window.location.href = `/pagamento_aprovado/${data.order_id}`;
                 }
             } catch (error) {
                 console.error("Erro ao verificar estado:", error);
             }
-        }, 3000); // Verifica a cada 3 segundos
+        }, 4000); // Verifica a cada 4 segundos
     </script>
 </body>
 </html>

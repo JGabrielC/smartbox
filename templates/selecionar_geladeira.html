@@ -2,20 +2,18 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Selecionar Geladeira - SmartBOX</title>
+    <title>Selecionar Geladeira - Smart Fridge Brasil</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_style.css') }}">
 </head>
 <body>
     <div class="wrapper">
         <nav class="sidebar">
-            <div class="sidebar-header"><h3 class="logo-text">SmartBOX Admin</h3></div>
+            <div class="sidebar-header"><h3 class="logo-text">Smart Fridge Admin</h3></div>
             <ul>
-                <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('gerenciar_condominios') }}">Condomínios</a></li>
                 <li><a href="{{ url_for('selecionar_geladeira') }}" class="active">Gerir Geladeiras</a></li>
                 <li><a href="{{ url_for('gerenciar_catalogo') }}">Catálogo Global</a></li>
                 <li><a href="{{ url_for('gerenciar_utilizadores') }}">Gestão de Utilizadores</a></li>
-                <li><a href="{{ url_for('relatorios') }}">Relatórios</a></li>
                 <li><a href="{{ url_for('logout') }}" class="logout-link">Sair</a></li>
             </ul>
         </nav>
@@ -24,7 +22,7 @@
             <div class="card">
                 <h2>Passo 1: Selecione o Condomínio</h2>
                 {% if condominios %}
-                    <p>Clique num condomínio para adicionar ou atualizar o stock de produtos da sua geladeira.</p>
+                    <p>Clique num condomínio para gerir o stock de produtos da sua geladeira.</p>
                     <ul class="condo-list">
                         {% for condo in condominios %}
                             <li><a href="{{ url_for('gerir_geladeira', condo_id=condo.id) }}">{{ condo.name }}</a></li>
@@ -33,7 +31,7 @@
                 {% else %}
                     <div class="empty-state">
                         <h2>Nenhum Condomínio Encontrado</h2>
-                        <p>Para gerir o stock de uma geladeira, primeiro precisa de criar um condomínio na secção apropriada.</p>
+                        <p>Para gerir o stock de uma geladeira, primeiro precisa de criar um condomínio.</p>
                         <a href="{{ url_for('gerenciar_condominios') }}" class="button">Adicionar Condomínio</a>
                     </div>
                 {% endif %}
