@@ -42,16 +42,24 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # --- Funções Auxiliares ---
-def save_picture(form_picture):
-    random_hex = secrets.token_hex(8)
-    _, f_ext = os.path.splitext(form_picture.filename)
-    picture_fn = random_hex + f_ext
-    picture_path = os.path.join(app.config['UPLOAD_FOLDER'], picture_fn)
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    i = Image.open(form_picture)
-    i.thumbnail((150, 150))
-    i.save(picture_path)
-    return picture_fn
+def is_cpf_valid(cpf: str) -> bool:
+    cpf_digits = [int(digit) for digit in cpf if digit.isdigit()]
+    if len(cpf_digits) != 11 or len(set(cpf_digits)) == 1:
+        return False
+
+    # Validação do primeiro dígito verificador
+    sum_of_products = sum(a*b for a, b in zip(cpf_digits[0:9], range(10, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if cpf_digits[9] != expected_digit:
+        return False
+
+    # Validação do segundo dígito verificador
+    sum_of_products = sum(a*b for a, b in zip(cpf_digits[0:10], range(11, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if cpf_digits[10] != expected_digit:
+        return False
+
+    return True
 
 # --- ROTAS DE AUTENTICAÇÃO ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -88,31 +96,34 @@ def cadastro():
         condominio_name = request.form.get('condominio_name')
         apartment_address = request.form.get('apartment_address')
         
-        # --- IMPLEMENTAÇÃO DA VALIDAÇÃO DE CPF ---
-        cpf_limpo = ''.join(filter(str.isdigit, cpf))
+        # 1. Validação Matemática Obrigatória
+        if not is_cpf_valid(cpf):
+            flash('O formato do CPF informado é inválido. Por favor, verifique.', 'danger')
+            return redirect(url_for('cadastro'))
+
+        # 2. Tentativa de Validação na API (não bloqueia mais o utilizador)
         try:
+            cpf_limpo = ''.join(filter(str.isdigit, cpf))
             api_url = f"https://brasilapi.com.br/api/cpf/v1/{cpf_limpo}"
-            response = requests.get(api_url)
+            response = requests.get(api_url, timeout=5) # Adiciona um timeout de 5 segundos
             
             if response.status_code == 200:
                 data = response.json()
-                # Verifica se o CPF está ativo
                 if data.get('situacao') != 'REGULAR':
-                    flash(f"O CPF informado está em situação '{data.get('situacao', 'desconhecida')}' e não pode ser usado.", 'danger')
+                    flash(f"O CPF informado está com a situação '{data.get('situacao', 'desconhecida')}' na Receita Federal.", 'danger')
                     return redirect(url_for('cadastro'))
             else:
-                # Se a API retornar um erro (ex: 404 para CPF não encontrado), informa o utilizador
-                flash('CPF não encontrado ou inválido. Por favor, verifique os seus dados.', 'danger')
-                return redirect(url_for('cadastro'))
+                print(f"AVISO: Não foi possível validar o estado do CPF {cpf}. API retornou status {response.status_code}. A continuar com o registo.")
 
         except requests.exceptions.RequestException as e:
-            # Se a API estiver fora do ar, avisa no terminal e continua sem a validação externa
-            print(f"AVISO: A API de validação de CPF falhou. Erro: {e}. A continuar sem validação externa.")
+            print(f"AVISO: A API de validação de CPF está offline ou demorou a responder. Erro: {e}. A continuar com o registo.")
 
+        # 3. Verifica se o CPF já existe no seu sistema
         if User.query.filter_by(cpf=cpf).first():
             flash('Este CPF já foi registado.', 'error')
             return redirect(url_for('cadastro'))
             
+        # 4. Se tudo estiver bem, cria o utilizador
         new_user = User(full_name=full_name, cpf=cpf, birth_date=birth_date, condominio_name=condominio_name, apartment_address=apartment_address)
         new_user.set_password(password)
         db.session.add(new_user)
