@@ -25,7 +25,6 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/profile_pics')
 # --- CONFIGURAÇÃO DO MERCADO PAGO ---
 # ATENÇÃO: Substitua pelas suas chaves reais de PRODUÇÃO do Mercado Pago
 MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR-2683965692592409-071011-19820758846ee46db59f8bb79039b115-250701524'
-MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-d2bb5f89-dd93-4e13-823d-f75c2fa40e3d'
 MERCADO_PAGO_API_URL = 'https://api.mercadopago.com/v1/payments'
 MERCADO_PAGO_PREFERENCES_URL = 'https://api.mercadopago.com/checkout/preferences'
 
@@ -60,7 +59,8 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard' if current_user.is_admin else 'user_dashboard'))
     if request.method == 'POST':
-        cpf = request.form.get('cpf'); password = request.form.get('password')
+        cpf = request.form.get('cpf')
+        password = request.form.get('password')
         user = User.query.filter_by(cpf=cpf).first()
         if user and user.check_password(password):
             login_user(user, remember=True)
@@ -81,13 +81,45 @@ def logout():
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
     if request.method == 'POST':
-        full_name = request.form.get('full_name'); cpf = request.form.get('cpf'); birth_date = request.form.get('birth_date'); password = request.form.get('password'); condominio_name = request.form.get('condominio_name'); apartment_address = request.form.get('apartment_address')
+        full_name = request.form.get('full_name')
+        cpf = request.form.get('cpf')
+        birth_date = request.form.get('birth_date')
+        password = request.form.get('password')
+        condominio_name = request.form.get('condominio_name')
+        apartment_address = request.form.get('apartment_address')
+        
+        # --- IMPLEMENTAÇÃO DA VALIDAÇÃO DE CPF ---
+        cpf_limpo = ''.join(filter(str.isdigit, cpf))
+        try:
+            api_url = f"https://brasilapi.com.br/api/cpf/v1/{cpf_limpo}"
+            response = requests.get(api_url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Verifica se o CPF está ativo
+                if data.get('situacao') != 'REGULAR':
+                    flash(f"O CPF informado está em situação '{data.get('situacao', 'desconhecida')}' e não pode ser usado.", 'danger')
+                    return redirect(url_for('cadastro'))
+            else:
+                # Se a API retornar um erro (ex: 404 para CPF não encontrado), informa o utilizador
+                flash('CPF não encontrado ou inválido. Por favor, verifique os seus dados.', 'danger')
+                return redirect(url_for('cadastro'))
+
+        except requests.exceptions.RequestException as e:
+            # Se a API estiver fora do ar, avisa no terminal e continua sem a validação externa
+            print(f"AVISO: A API de validação de CPF falhou. Erro: {e}. A continuar sem validação externa.")
+
         if User.query.filter_by(cpf=cpf).first():
-            flash('Este CPF já foi registado.', 'error'); return redirect(url_for('cadastro'))
-        new_user = User(full_name=full_name, cpf=cpf, birth_date=birth_date, condominio_name=condominio_name, apartment_address=apartment_address); new_user.set_password(password)
-        db.session.add(new_user); db.session.commit()
+            flash('Este CPF já foi registado.', 'error')
+            return redirect(url_for('cadastro'))
+            
+        new_user = User(full_name=full_name, cpf=cpf, birth_date=birth_date, condominio_name=condominio_name, apartment_address=apartment_address)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
         flash('Registo efetuado com sucesso! Inicie a sessão.', 'success')
         return redirect(url_for('login'))
+        
     condominios_disponiveis = Condominio.query.order_by(Condominio.name).all()
     return render_template('cadastro.html', condominios=condominios_disponiveis)
 
