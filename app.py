@@ -249,7 +249,7 @@ def finalizar_compra_pix():
         nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
         db.session.add(nova_venda)
     db.session.commit()
-    total_amount = round(total_amount, 2); description = ", ".join(description_items)
+    total_amount = round(total_amount, 2); description = f"{', '.join(description_items)} ({item.condominio.name})"
     
     headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
     notification_url = url_for('webhook_mercado_pago', _external=True)

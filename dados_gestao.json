@@ -1,0 +1,499 @@
+{
+    "produtos": {
+        "prod_ec3c61": {
+            "nome": "coca cola 310ml",
+            "custo": 3.5,
+            "venda": 5.0
+        },
+        "prod_7805fd": {
+            "nome": "coca cola 310mlll",
+            "custo": 59.0,
+            "venda": 400.0
+        }
+    },
+    "condominios": {
+        "condo_06ebbb": {
+            "nome": "Monte siao condominio I",
+            "endereco": "R. Dezoito, Quadra 17 - Lote 08 - Jardim Ceu Azul, Valparaíso de Goiás - GO, 72871-012"
+        }
+    },
+    "vendas": [
+        {
+            "id": "v_cf4a43",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:11:02.422540"
+        },
+        {
+            "id": "v_c30885",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:11:09.366310"
+        },
+        {
+            "id": "v_bdf01c",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:11:11.110141"
+        },
+        {
+            "id": "v_dc1483",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:11:12.616182"
+        },
+        {
+            "id": "v_785ef0",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:11:14.452270"
+        },
+        {
+            "id": "v_be7180",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:08.054713"
+        },
+        {
+            "id": "v_af0a00",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:10.102460"
+        },
+        {
+            "id": "v_817b64",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:11.957818"
+        },
+        {
+            "id": "v_88f796",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:13.472644"
+        },
+        {
+            "id": "v_257624",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:23.733612"
+        },
+        {
+            "id": "v_0731c8",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:26.236598"
+        },
+        {
+            "id": "v_0bd297",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:28.893854"
+        },
+        {
+            "id": "v_699d45",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:12:31.046373"
+        },
+        {
+            "id": "v_1b54a3",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:21.244377"
+        },
+        {
+            "id": "v_b0506f",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:23.932692"
+        },
+        {
+            "id": "v_beed72",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:26.229224"
+        },
+        {
+            "id": "v_21468b",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:27.909095"
+        },
+        {
+            "id": "v_0adffa",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:29.829212"
+        },
+        {
+            "id": "v_cfe793",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:31.365008"
+        },
+        {
+            "id": "v_253da6",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:33.036426"
+        },
+        {
+            "id": "v_a4b575",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:34.531404"
+        },
+        {
+            "id": "v_5f9627",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:35.892184"
+        },
+        {
+            "id": "v_515124",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:37.363513"
+        },
+        {
+            "id": "v_9ca090",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:39.324964"
+        },
+        {
+            "id": "v_223bdc",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:41.219506"
+        },
+        {
+            "id": "v_a672a0",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:42.859442"
+        },
+        {
+            "id": "v_766c10",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:15:53.525118"
+        },
+        {
+            "id": "v_b6c315",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:09.084584"
+        },
+        {
+            "id": "v_093b68",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:10.546720"
+        },
+        {
+            "id": "v_cdd6f2",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:11.869540"
+        },
+        {
+            "id": "v_97b756",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:13.467849"
+        },
+        {
+            "id": "v_f48aed",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:15.236287"
+        },
+        {
+            "id": "v_4d6c89",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:16.571555"
+        },
+        {
+            "id": "v_066998",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:18.227821"
+        },
+        {
+            "id": "v_4a7a5c",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:19.511200"
+        },
+        {
+            "id": "v_e84f86",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:20.779542"
+        },
+        {
+            "id": "v_09afc8",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:22.836086"
+        },
+        {
+            "id": "v_5a0f73",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:24.048988"
+        },
+        {
+            "id": "v_13ed47",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:25.490963"
+        },
+        {
+            "id": "v_e9221f",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:26.860208"
+        },
+        {
+            "id": "v_709ea6",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:28.005378"
+        },
+        {
+            "id": "v_da646f",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:29.139501"
+        },
+        {
+            "id": "v_69aff1",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:33.490381"
+        },
+        {
+            "id": "v_f20ba0",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:34.695540"
+        },
+        {
+            "id": "v_ca3343",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:16:35.992740"
+        },
+        {
+            "id": "v_741f9d",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:32:06.190377"
+        },
+        {
+            "id": "v_cd9365",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:32:11.149381"
+        },
+        {
+            "id": "v_1e6960",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:32:15.365025"
+        },
+        {
+            "id": "v_9dba18",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:32:17.632321"
+        },
+        {
+            "id": "v_48df78",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_ec3c61",
+            "quantidade": 1,
+            "precoVendaUnitario": 5.0,
+            "timestamp": "2025-06-18T20:32:25.361754"
+        },
+        {
+            "id": "v_dea23d",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:33:10.943609"
+        },
+        {
+            "id": "v_843036",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:33:13.429522"
+        },
+        {
+            "id": "v_d5d8a0",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:33:17.245471"
+        },
+        {
+            "id": "v_835015",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:33:20.148939"
+        },
+        {
+            "id": "v_18919f",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:33:46.277227"
+        },
+        {
+            "id": "v_5aee5a",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:34:04.515352"
+        },
+        {
+            "id": "v_5170f1",
+            "condominioId": "condo_06ebbb",
+            "produtoId": "prod_7805fd",
+            "quantidade": 1,
+            "precoVendaUnitario": 400.0,
+            "timestamp": "2025-06-18T20:34:35.524651"
+        }
+    ],
+    "despesas": [
+        {
+            "id": "desp_78b6b7",
+            "nome": "Aluguel da geladeira",
+            "valor": 600.0,
+            "dataVencimento": "2025-08-01",
+            "pago": false
+        }
+    ],
+    "investimentos": {
+        "condo_06ebbb": 1100.0
+    },
+    "custos_energia": {
+        "condo_06ebbb": 50.0
+    },
+    "inventario": {
+        "condo_06ebbb": {
+            "prod_ec3c61": 0,
+            "prod_7805fd": 43
+        }
+    }
+}
