@@ -129,7 +129,7 @@ def cadastro():
         db.session.add(new_user)
         db.session.commit()
         flash('Registo efetuado com sucesso! Inicie a sessão.', 'success')
-        return redirect(url_for('login'))
+        return redirect(url_for('registro_sucesso'))
         
     condominios_disponiveis = Condominio.query.order_by(Condominio.name).all()
     return render_template('cadastro.html', condominios=condominios_disponiveis)
@@ -156,22 +156,87 @@ def user_dashboard():
 @login_required
 def meu_perfil():
     if request.method == 'POST':
-        if 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file.filename != '':
-                picture_file = save_picture(file); current_user.profile_image = picture_file
-                db.session.commit(); flash('A sua foto de perfil foi atualizada!', 'success')
-                return redirect(url_for('meu_perfil'))
-        old_password = request.form.get('old_password'); new_password = request.form.get('new_password')
-        if old_password and new_password:
+        action = request.form.get('action')
+
+        if action == 'update_profile':
+            current_user.full_name = request.form.get('full_name')
+            current_user.apartment_address = request.form.get('apartment_address')
+            
+            if 'profile_pic' in request.files:
+                file = request.files['profile_pic']
+                if file.filename != '':
+                    picture_file = save_picture(file)
+                    current_user.profile_image = picture_file
+            
+            db.session.commit()
+            flash('Os seus dados foram atualizados com sucesso!', 'success')
+
+        elif action == 'change_password':
+            old_password = request.form.get('old_password')
+            new_password = request.form.get('new_password')
             confirm_password = request.form.get('confirm_password')
-            if not current_user.check_password(old_password): flash('A sua palavra-passe antiga está incorreta.', 'danger')
-            elif new_password != confirm_password: flash('As novas palavras-passe não coincidem.', 'danger')
+
+            if not current_user.check_password(old_password):
+                flash('A sua palavra-passe antiga está incorreta.', 'danger')
+            elif new_password != confirm_password:
+                flash('As novas palavras-passe não coincidem.', 'danger')
             else:
-                current_user.set_password(new_password); db.session.commit()
+                current_user.set_password(new_password)
+                db.session.commit()
                 flash('Palavra-passe alterada com sucesso!', 'success')
-                return redirect(url_for('meu_perfil'))
+        
+        return redirect(url_for('meu_perfil'))
+
     return render_template('meu_perfil.html')
+
+
+# --- NOVA ROTA PARA EXCLUIR CONTA ---
+@app.route('/excluir_minha_conta', methods=['POST'])
+@login_required
+def excluir_minha_conta():
+    user = User.query.get(current_user.id)
+    if user:
+        Sale.query.filter_by(user_id=user.id).delete()
+        user.favorite_products = []
+        db.session.commit()
+        
+        db.session.delete(user)
+        db.session.commit()
+        
+        logout_user()
+        flash('A sua conta foi excluída com sucesso.', 'success')
+        return redirect(url_for('login'))
+    
+    flash('Ocorreu um erro ao excluir a sua conta.', 'danger')
+    return redirect(url_for('meu_perfil'))
+
+# --- NOVA ROTA DEDICADA AO UPLOAD DA FOTO ---
+@app.route('/upload_profile_pic', methods=['POST'])
+@login_required
+def upload_profile_pic():
+    if 'profile_pic' in request.files:
+        file = request.files['profile_pic']
+        if file.filename != '':
+            try:
+                picture_file = save_picture(file)
+                current_user.profile_image = picture_file
+                db.session.commit()
+                flash('Foto de perfil atualizada com sucesso!', 'success')
+            except Exception as e:
+                flash('Ocorreu um erro ao guardar a sua foto.', 'danger')
+                print(e)
+    return redirect(url_for('meu_perfil'))
+
+def save_picture(form_picture):
+    random_hex = secrets.token_hex(8)
+    _, f_ext = os.path.splitext(form_picture.filename)
+    picture_fn = random_hex + f_ext
+    picture_path = os.path.join(app.config['UPLOAD_FOLDER'], picture_fn)
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    i = Image.open(form_picture)
+    i.thumbnail((250, 250)) # Aumentei um pouco a qualidade
+    i.save(picture_path)
+    return picture_fn
 
 @app.route('/toggle_favorite/<int:product_id>', methods=['POST'])
 @login_required
@@ -206,13 +271,17 @@ def adicionar_carrinho(inventory_id):
 @app.route('/carrinho')
 @login_required
 def ver_carrinho():
-    cart = session.get('cart', {}); cart_items = []; total_geral = 0
-    for inv_id, quantity in cart.items():
-        item = Inventory.query.get(int(inv_id))
-        if item:
-            subtotal = item.product.sell_price * quantity
-            cart_items.append({'id': item.id, 'product': item.product, 'quantity': quantity, 'max_quantity': item.quantity, 'subtotal': subtotal})
-            total_geral += subtotal
+    cart = session.get('cart', {})
+    cart_items = []
+    total_geral = 0
+    if cart:
+        for inv_id, quantity in cart.items():
+            item = Inventory.query.get(int(inv_id))
+            if item:
+                subtotal = item.product.sell_price * quantity
+                # CORREÇÃO: Renomeado 'item' para 'inventory_item' para evitar conflitos
+                cart_items.append({'inventory_item': item, 'quantity': quantity, 'subtotal': subtotal})
+                total_geral += subtotal
     return render_template('carrinho.html', cart_items=cart_items, total_geral=total_geral)
 
 @app.route('/atualizar_carrinho', methods=['POST'])
@@ -234,6 +303,15 @@ def remover_do_carrinho():
     session['cart'] = cart
     return redirect(url_for('ver_carrinho'))
 
+# --- NOVA ROTA PARA LIMPAR O CARRINHO ---
+@app.route('/limpar_carrinho', methods=['POST'])
+@login_required
+def limpar_carrinho():
+    session.pop('cart', None)
+    flash('O seu carrinho foi esvaziado.', 'success')
+    return redirect(url_for('ver_carrinho'))
+
+
 @app.route('/finalizar_compra_pix')
 @login_required
 def finalizar_compra_pix():
@@ -249,7 +327,7 @@ def finalizar_compra_pix():
         nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
         db.session.add(nova_venda)
     db.session.commit()
-    total_amount = round(total_amount, 2); description = f"{', '.join(description_items)} ({item.condominio.name})"
+    total_amount = round(total_amount, 2); description = ", ".join(description_items)
     
     headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
     notification_url = url_for('webhook_mercado_pago', _external=True)
@@ -479,6 +557,35 @@ def excluir_produto_catalogo(product_id):
     db.session.delete(produto_para_excluir); db.session.commit()
     flash(f'Produto "{produto_para_excluir.name}" foi excluído do catálogo global.', 'success')
     return redirect(url_for('gerenciar_catalogo'))
+
+def is_cpf_valid(cpf: str) -> bool:
+    cpf_digits = [int(digit) for digit in cpf if digit.isdigit()]
+    if len(cpf_digits) != 11 or len(set(cpf_digits)) == 1: return False
+    sum_of_products = sum(a*b for a, b in zip(cpf_digits[0:9], range(10, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if cpf_digits[9] != expected_digit: return False
+    sum_of_products = sum(a*b for a, b in zip(cpf_digits[0:10], range(11, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if cpf_digits[10] != expected_digit: return False
+    return True
+
+@app.route('/api/validate_cpf/<string:cpf>')
+def validate_cpf_api(cpf):
+    cpf_formatado = ''.join(filter(str.isdigit, cpf))
+    if not is_cpf_valid(cpf_formatado):
+        return jsonify({'valid': False, 'message': 'CPF com formato inválido.'}), 400
+    
+    user = User.query.filter_by(cpf=cpf).first()
+    if user:
+        return jsonify({'valid': False, 'message': 'Este CPF já está registado.'}), 409 # 409 Conflict
+        
+    return jsonify({'valid': True})
+
+# --- NOVA ROTA PARA A PÁGINA DE SUCESSO ---
+@app.route('/registro_sucesso')
+def registro_sucesso():
+    return render_template('registro_sucesso.html')
+
 
 # --- Bloco Principal para Executar a Aplicação ---
 if __name__ == '__main__':
