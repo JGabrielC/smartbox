@@ -315,32 +315,54 @@ def limpar_carrinho():
 @app.route('/finalizar_compra_pix')
 @login_required
 def finalizar_compra_pix():
-    cart = session.get('cart', {});
-    if not cart: return redirect(url_for('user_dashboard'))
-    total_amount = 0; description_items = []; order_id = str(uuid.uuid4())
+    cart = session.get('cart', {})
+    if not cart:
+        return redirect(url_for('user_dashboard'))
+
+    total_amount = 0
+    sales_group = []
+    description_items = []
+    order_id = str(uuid.uuid4())
+
     for inv_id, quantity in cart.items():
-        item = Inventory.query.get(int(inv_id));
+        item = Inventory.query.get(int(inv_id))
         if not item or item.quantity < quantity:
-            flash(f"Stock insuficiente para {item.product.name}. Por favor, ajuste o seu carrinho.", "danger"); return redirect(url_for('ver_carrinho'))
+            flash(f"Stock insuficiente para {item.product.name}.", "danger")
+            return redirect(url_for('ver_carrinho'))
+        
         total_amount += item.product.sell_price * quantity
         description_items.append(f"{quantity}x {item.product.name}")
+        
         nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
         db.session.add(nova_venda)
-    db.session.commit()
-    total_amount = round(total_amount, 2); description = ", ".join(description_items)
     
-    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
-    notification_url = url_for('webhook_mercado_pago', _external=True)
-    payload = {"transaction_amount": float(total_amount), "description": description, "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"}, "external_reference": order_id}
-    try:
-        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); response.raise_for_status()
-        payment_data = response.json(); sale_payment_id = str(payment_data['id'])
-        Sale.query.filter_by(payment_id=order_id).update({"payment_id": sale_payment_id}); db.session.commit()
-        qr_code = payment_data['point_of_interaction']['transaction_data']['qr_code']; qr_code_base64 = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
-        return render_template('payment.html', qr_code=qr_code, qr_code_base64=qr_code_base64, sale_payment_id=sale_payment_id)
-    except requests.exceptions.RequestException as e:
-        print(f"Erro ao comunicar com o Mercado Pago: {e}"); flash('Não foi possível iniciar o pagamento PIX.', 'error'); return redirect(url_for('ver_carrinho'))
+    db.session.commit()
 
+    description = f"{', '.join(description_items)} | {current_user.full_name}"
+    
+    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json'}
+    payload = {
+        "transaction_amount": round(total_amount, 2), "description": description,
+        "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"},
+        "external_reference": order_id
+    }
+    
+    try:
+        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers)
+        response.raise_for_status()
+        payment_data = response.json()
+        
+        payment_id = str(payment_data['id'])
+        Sale.query.filter_by(payment_id=order_id).update({'payment_id': payment_id})
+        db.session.commit()
+
+        qr_code_pix = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
+        return render_template('payment.html', qr_code_pix=qr_code_pix, payment_id=payment_id)
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao criar pagamento PIX: {e}")
+        flash('Não foi possível iniciar o pagamento.', 'error')
+        return redirect(url_for('ver_carrinho'))
+    
 @app.route('/webhook/pix', methods=['POST'])
 def webhook_mercado_pago():
     data = request.json
@@ -421,13 +443,55 @@ def payment_failed():
     return render_template('payment_failed.html')
 
 # --- ROTA PARA O HARDWARE DA GELADEIRA ---
-@app.route('/api/liberar_geladeira/<string:order_id>')
-def api_liberar_geladeira(order_id):
-    venda = Sale.query.filter_by(payment_id=order_id, status='paid').first()
-    if venda:
-        print(f"Comando recebido: ABRIR GELADEIRA para a ordem {order_id}"); return jsonify({"status": "success", "message": "Porta liberada"}), 200
-    else:
-        print(f"Tentativa de abertura FALHOU para a ordem {order_id}"); return jsonify({"status": "error", "message": "QR Code inválido ou não pago"}), 404
+@app.route('/api/liberar_geladeira/<string:payment_id>')
+def api_liberar_geladeira(payment_id):
+    with app.app_context():
+        # Procura por UMA venda associada a este pagamento
+        venda_referencia = Sale.query.filter_by(payment_id=payment_id).first()
+
+        if not venda_referencia:
+            return jsonify({'status': 'error', 'message': 'Compra não encontrada'}), 404
+        
+        # Se a compra já foi usada para abrir a porta, recusa.
+        if venda_referencia.status == 'completed':
+            return jsonify({'status': 'error', 'message': 'Este QR Code já foi utilizado.'}), 403
+
+        # Faz a verificação final e em tempo real com o Mercado Pago
+        headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'}
+        try:
+            mp_response = requests.get(f'{MERCADO_PAGO_API_URL}/{payment_id}', headers=headers)
+            mp_response.raise_for_status()
+            payment_info = mp_response.json()
+
+            if payment_info.get('status') == 'approved':
+                # Se aprovado, faz a baixa de stock e marca como completo
+                vendas_da_ordem = Sale.query.filter_by(payment_id=payment_id, status='pending').all()
+                if vendas_da_ordem:
+                    for venda in vendas_da_ordem:
+                        item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
+                        if item:
+                            item.quantity -= venda.quantity_sold
+                    # Atualiza o status de todas as vendas para 'completed' de uma só vez
+                    Sale.query.filter_by(payment_id=payment_id).update({'status': 'completed'})
+                    db.session.commit()
+                    return jsonify({'status': 'ok', 'message': 'Acesso liberado'})
+                else:
+                    # Se não encontrou vendas pendentes, pode ser que o webhook já tenha atualizado para 'paid'
+                    # Vamos verificar e permitir o acesso, mas marcar como 'completed'
+                    vendas_ja_pagas = Sale.query.filter_by(payment_id=payment_id, status='paid').all()
+                    if vendas_ja_pagas:
+                        Sale.query.filter_by(payment_id=payment_id).update({'status': 'completed'})
+                        db.session.commit()
+                        return jsonify({'status': 'ok', 'message': 'Acesso liberado (confirmado novamente)'})
+                    else:
+                        return jsonify({'status': 'error', 'message': 'Estado da compra inconsistente'}), 500
+
+            else:
+                return jsonify({'status': 'error', 'message': 'Pagamento não confirmado pelo Mercado Pago.'}), 402
+        except Exception as e:
+            print(f"Erro crítico na API da geladeira: {e}")
+            return jsonify({'status': 'error', 'message': 'Erro interno ao validar pagamento'}), 500
+
 
 # --- ROTAS DO PAINEL DO ADMINISTRADOR ---
 @app.route('/admin')
