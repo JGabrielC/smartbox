@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geladeira Liberada! - Smart Fridge Brasil</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        body { font-family: 'Poppins', -apple-system, sans-serif; background-color: #121212; margin: 0; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; padding: 20px; box-sizing: border-box; }
+        .success-container { background: #1f1f1f; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border: 1px solid #333; text-align: center; padding: 50px 40px; }
+        .success-icon {
+            width: 80px; height: 80px; border-radius: 50%;
+            background-color: #28a745; color: #fff;
+            display: flex; justify-content: center; align-items: center;
+            margin: 0 auto 25px auto;
+            font-size: 40px; font-weight: bold;
+            animation: popIn 0.5s 0.2s ease-out backwards;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        h1 { font-size: 1.8rem; font-weight: 700; color: #fff; margin-bottom: 15px; }
+        p { color: #a0a0a0; line-height: 1.6; font-size: 1rem; }
+        .reminder { margin-top: 30px; font-style: italic; }
+        .action-button { display: inline-block; margin-top: 30px; padding: 12px 30px; background-color: #ffab4c; color: #121212; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; transition: background-color 0.2s; }
+        .action-button:hover { background-color: #e69a45; }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="success-icon">✓</div>
+        <h1>Geladeira Liberada!</h1>
+        <p>A porta foi destravada. Boas compras!</p>
+        <p class="reminder">Lembrete: não se esqueça de fechar a porta após retirar os seus produtos.</p>
+        <a href="{{ url_for('user_dashboard') }}" class="action-button">Voltar à Loja</a>
+    </div>
+</body>
+</html>

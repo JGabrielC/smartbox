@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apresente o QR Code - Smart Fridge Brasil</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        body { font-family: 'Poppins', -apple-system, sans-serif; background-color: #121212; margin: 0; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; padding: 20px; box-sizing: border-box; }
+        .container { background: #1f1f1f; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border: 1px solid #333; text-align: center; padding: 50px 40px; }
+        .qr-code-wrapper { background-color: white; padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 25px; }
+        h1 { font-size: 1.8rem; font-weight: 700; color: #fff; margin-bottom: 15px; }
+        p { color: #a0a0a0; line-height: 1.6; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.2); border-left-color: #ffab4c; border-radius: 50%; margin: 20px auto 0; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pagamento Aprovado!</h1>
+        <p>Aproxime o código abaixo do leitor na geladeira para a destravar.</p>
+        <div class="qr-code-wrapper">
+            <img src="{{ qr_code_acesso }}" alt="QR Code de Acesso">
+        </div>
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        const paymentId = "{{ payment_id }}";
+        
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/unlock_status/${paymentId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'unlocked') {
+                        clearInterval(interval); // Para a verificação
+                        window.location.href = "{{ url_for('unlock_success') }}"; // Redireciona para a página final
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao verificar o estado da porta:", error);
+            }
+        }, 2000); // Verifica a cada 2 segundos
+    </script>
+</body>
+</html>

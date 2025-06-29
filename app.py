@@ -315,32 +315,81 @@ def limpar_carrinho():
 @app.route('/finalizar_compra_pix')
 @login_required
 def finalizar_compra_pix():
-    cart = session.get('cart', {});
-    if not cart: return redirect(url_for('user_dashboard'))
-    total_amount = 0; description_items = []; order_id = str(uuid.uuid4())
+    cart = session.get('cart', {})
+    if not cart:
+        return redirect(url_for('user_dashboard'))
+
+    order_id = str(uuid.uuid4())
+    total_amount = 0
+    description_items = []
+    
     for inv_id, quantity in cart.items():
-        item = Inventory.query.get(int(inv_id));
+        item = Inventory.query.get(int(inv_id))
         if not item or item.quantity < quantity:
-            flash(f"Stock insuficiente para {item.product.name}. Por favor, ajuste o seu carrinho.", "danger"); return redirect(url_for('ver_carrinho'))
+            flash(f"Stock insuficiente para {item.product.name}.", "danger")
+            return redirect(url_for('ver_carrinho'))
+        
         total_amount += item.product.sell_price * quantity
         description_items.append(f"{quantity}x {item.product.name}")
-        nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
+        
+        nova_venda = Sale(
+            user_id=current_user.id, product_id=item.product.id, 
+            condominio_id=item.condominio_id, quantity_sold=quantity, 
+            price_at_sale=item.product.sell_price * quantity, 
+            cost_at_sale=item.product.cost_price * quantity,
+            status='pending', 
+            external_reference=order_id
+        )
         db.session.add(nova_venda)
+    
     db.session.commit()
-    total_amount = round(total_amount, 2); description = ", ".join(description_items)
+
+    # --- LÓGICA PARA PREPARAR OS DADOS DO PAGADOR (CORRIGIDA) ---
+    cpf_limpo = ''.join(filter(str.isdigit, current_user.cpf))
     
-    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
-    notification_url = url_for('webhook_mercado_pago', _external=True)
-    payload = {"transaction_amount": float(total_amount), "description": description, "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"}, "external_reference": order_id}
+    # Lógica robusta para separar nome e apelido
+    name_parts = current_user.full_name.strip().split()
+    first_name = name_parts[0]
+    last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else first_name
+
+    payer_data = {
+        "email": f"cliente_{current_user.id}@smartbox.com",
+        "first_name": first_name,
+        "last_name": last_name,
+        "identification": {
+            "type": "CPF",
+            "number": cpf_limpo
+        }
+    }
+    
+    description = f"{', '.join(description_items)} | {current_user.full_name}"
+
+    payload = {
+        "transaction_amount": round(total_amount, 2),
+        "description": description,
+        "payment_method_id": "pix",
+        "payer": payer_data,
+        "external_reference": order_id
+    }
+    
     try:
-        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); response.raise_for_status()
-        payment_data = response.json(); sale_payment_id = str(payment_data['id'])
-        Sale.query.filter_by(payment_id=order_id).update({"payment_id": sale_payment_id}); db.session.commit()
-        qr_code = payment_data['point_of_interaction']['transaction_data']['qr_code']; qr_code_base64 = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
-        return render_template('payment.html', qr_code=qr_code, qr_code_base64=qr_code_base64, sale_payment_id=sale_payment_id)
+        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers={'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'})
+        response.raise_for_status()
+        payment_data = response.json()
+        
+        payment_id = str(payment_data['id'])
+        Sale.query.filter_by(external_reference=order_id).update({'payment_id': payment_id})
+        db.session.commit()
+
+        qr_code_pix = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
+        return render_template('payment.html', qr_code_pix=qr_code_pix, order_id=order_id, payment_id=payment_id)
     except requests.exceptions.RequestException as e:
-        print(f"Erro ao comunicar com o Mercado Pago: {e}"); flash('Não foi possível iniciar o pagamento PIX.', 'error'); return redirect(url_for('ver_carrinho'))
-    
+        print(f"ERRO AO CRIAR PAGAMENTO PIX: {e.response.json() if e.response else e}")
+        flash('Não foi possível iniciar o pagamento.', 'error')
+        return redirect(url_for('ver_carrinho'))
+
+
+
 @app.route('/webhook/pix', methods=['POST'])
 def webhook_mercado_pago():
     data = request.json
@@ -404,60 +453,70 @@ def check_payment_status(sale_payment_id):
     # Se não encontrou ou ainda está pendente após a verificação
     return jsonify({"status": "pending"})
 
-@app.route('/pagamento_aprovado/<string:order_id>')
+# --- ROTA DE SUCESSO DE PAGAMENTO (ATUALIZADA) ---
+@app.route('/pagamento_sucesso/<string:payment_id>')
 @login_required
-def pagamento_aprovado(order_id):
-    # Gera o QR Code com o order_id para ser lido pela geladeira
-    qr = qrcode.QRCode(version=1, box_size=10, border=5); qr.add_data(order_id); qr.make(fit=True)
-    img = qr.make_image(fill='black', back_color='white'); buffered = BytesIO()
-    img.save(buffered, format="PNG"); img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    qr_code_url = f"data:image/png;base64,{img_str}"
+def pagamento_sucesso(payment_id):
     session.pop('cart', None) # Limpa o carrinho
-    return render_template('payment_success.html', qr_code_url=qr_code_url)
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(payment_id) # O QR Code de acesso contém o ID do pagamento
+    qr.make(fit=True)
+    buffered = BytesIO()
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    # Agora passamos o payment_id para a página, para que o JavaScript possa usá-lo
+    return render_template('payment_success.html', 
+                           qr_code_acesso=f"data:image/png;base64,{img_str}",
+                           payment_id=payment_id)
+
+# --- NOVA ROTA DE VERIFICAÇÃO DE ABERTURA ---
+@app.route('/api/unlock_status/<string:payment_id>')
+def check_unlock_status(payment_id):
+    """Verifica se a venda associada já foi completada (porta aberta)."""
+    with app.app_context():
+        sale = Sale.query.filter_by(payment_id=payment_id).first()
+        if sale and sale.status == 'completed':
+            return jsonify({'status': 'unlocked'})
+        else:
+            return jsonify({'status': 'waiting'}), 202 # 202 Accepted: o pedido foi aceite, mas ainda não foi processado
+
+# --- NOVA PÁGINA DE CONFIRMAÇÃO FINAL ---
+@app.route('/geladeira_liberada')
+def unlock_success():
+    return render_template('unlock_success.html')
 
 @app.route('/payment_failed')
 @login_required
 def payment_failed():
     return render_template('payment_failed.html')
 
-# --- ROTA PARA O HARDWARE DA GELADEIRA ---
-@app.route('/api/liberar_geladeira/<string:payment_id>')
-def api_liberar_geladeira(payment_id):
+# --- API PARA A GELADEIRA (RECONSTRUÍDA E SEGURA) ---
+@app.route('/api/liberar_geladeira/<string:order_id>')
+def api_liberar_geladeira(order_id):
     with app.app_context():
-        venda_referencia = Sale.query.filter_by(payment_id=payment_id).first()
-        if not venda_referencia:
+        # Procura pelo nosso ID interno (external_reference)
+        venda = Sale.query.filter_by(external_reference=order_id).first()
+        if not venda:
             return jsonify({'status': 'error', 'message': 'Compra não encontrada'}), 404
-        
-        if venda_referencia.status == 'completed':
+
+        if venda.status == 'completed':
             return jsonify({'status': 'error', 'message': 'Este QR Code já foi utilizado.'}), 403
 
         headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'}
-        try:
-            mp_response = requests.get(f'{MERCADO_PAGO_API_URL}/{payment_id}', headers=headers)
-            mp_response.raise_for_status()
-            payment_info = mp_response.json()
-
-            if payment_info.get('status') == 'approved':
-                vendas_para_processar = Sale.query.filter_by(payment_id=payment_id).all()
-                if not vendas_para_processar or vendas_para_processar[0].status == 'completed':
-                    return jsonify({'status': 'error', 'message': 'Venda já processada.'}), 409
-
-                for venda in vendas_para_processar:
-                    item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
-                    if item and item.quantity >= venda.quantity_sold:
-                        item.quantity -= venda.quantity_sold
-                    else:
-                        print(f"ALERTA: Stock insuficiente para o produto {venda.product_id} na venda {venda.id}. Baixa de stock não realizada.")
-                    venda.status = 'completed'
-
-                db.session.commit()
-                return jsonify({'status': 'ok', 'message': 'Acesso liberado'})
-            else:
-                return jsonify({'status': 'error', 'message': 'Pagamento não confirmado pelo Mercado Pago.'}), 402
-        except Exception as e:
-            print(f"Erro crítico na API da geladeira: {e}")
-            return jsonify({'status': 'error', 'message': 'Erro interno ao validar pagamento'}), 500
-
+        mp_response = requests.get(f'{MERCADO_PAGO_API_URL}/{venda.payment_id}', headers=headers)
+        
+        if mp_response.ok and mp_response.json().get('status') == 'approved':
+            vendas_da_ordem = Sale.query.filter_by(external_reference=order_id).all()
+            for v in vendas_da_ordem:
+                item = Inventory.query.filter_by(product_id=v.product_id, condominio_id=v.condominio_id).first()
+                if item: item.quantity -= v.quantity_sold
+                v.status = 'completed'
+            db.session.commit()
+            return jsonify({'status': 'ok'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Pagamento não confirmado'}), 402
 
 
 # --- ROTAS DO PAINEL DO ADMINISTRADOR ---
