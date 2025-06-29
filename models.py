@@ -64,6 +64,7 @@ class Sale(db.Model):
     cost_at_sale = db.Column(db.Float, nullable=False)
     sale_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     status = db.Column(db.String(20), nullable=False, default='pending') # pending -> paid -> completed
-    payment_id = db.Column(db.String(100), nullable=True)
+    payment_id = db.Column(db.String(100), nullable=True) # ID do Mercado Pago
+    external_reference = db.Column(db.String(100), nullable=False, unique=True) # Nosso ID interno (UUID)
     user = db.relationship('User')
     product = db.relationship('Product')
