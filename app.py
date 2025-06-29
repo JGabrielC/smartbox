@@ -315,67 +315,31 @@ def limpar_carrinho():
 @app.route('/finalizar_compra_pix')
 @login_required
 def finalizar_compra_pix():
-    cart = session.get('cart', {})
-    if not cart:
-        return redirect(url_for('user_dashboard'))
-
-    total_amount = 0
-    sales_group = []
-    description_items = []
-    order_id = str(uuid.uuid4())
-
+    cart = session.get('cart', {});
+    if not cart: return redirect(url_for('user_dashboard'))
+    total_amount = 0; description_items = []; order_id = str(uuid.uuid4())
     for inv_id, quantity in cart.items():
-        item = Inventory.query.get(int(inv_id))
+        item = Inventory.query.get(int(inv_id));
         if not item or item.quantity < quantity:
-            flash(f"Stock insuficiente para {item.product.name}.", "danger")
-            return redirect(url_for('ver_carrinho'))
-        
+            flash(f"Stock insuficiente para {item.product.name}. Por favor, ajuste o seu carrinho.", "danger"); return redirect(url_for('ver_carrinho'))
         total_amount += item.product.sell_price * quantity
         description_items.append(f"{quantity}x {item.product.name}")
-        
         nova_venda = Sale(user_id=current_user.id, product_id=item.product.id, condominio_id=item.condominio_id, quantity_sold=quantity, price_at_sale=item.product.sell_price * quantity, cost_at_sale=item.product.cost_price * quantity, status='pending', payment_id=order_id)
         db.session.add(nova_venda)
-    
     db.session.commit()
-
-    description = f"{', '.join(description_items)} | {current_user.full_name}"
+    total_amount = round(total_amount, 2); description = ", ".join(description_items)
     
-    # --- DADOS DO PAGADOR (CORRIGIDO E COMPLETO) ---
-    cpf_limpo = ''.join(filter(str.isdigit, current_user.cpf))
-    payer_data = {
-        "email": f"cliente_{current_user.id}@smartbox.com",
-        "first_name": current_user.full_name.split(' ')[0],
-        "last_name": ' '.join(current_user.full_name.split(' ')[1:]),
-        "identification": {
-            "type": "CPF",
-            "number": cpf_limpo
-        }
-    }
-
-    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json'}
-    payload = {
-        "transaction_amount": round(total_amount, 2),
-        "description": description,
-        "payment_method_id": "pix",
-        "payer": payer_data, # <--- DADOS DO PAGADOR ATUALIZADOS
-        "external_reference": order_id
-    }
-    
+    headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'X-Idempotency-Key': order_id}
+    notification_url = url_for('webhook_mercado_pago', _external=True)
+    payload = {"transaction_amount": float(total_amount), "description": description, "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"}, "external_reference": order_id}
     try:
-        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        payment_data = response.json()
-        
-        payment_id = str(payment_data['id'])
-        Sale.query.filter_by(payment_id=order_id).update({'payment_id': payment_id})
-        db.session.commit()
-
-        qr_code_pix = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
-        return render_template('payment.html', qr_code_pix=qr_code_pix, payment_id=payment_id)
+        response = requests.post(MERCADO_PAGO_API_URL, json=payload, headers=headers); response.raise_for_status()
+        payment_data = response.json(); sale_payment_id = str(payment_data['id'])
+        Sale.query.filter_by(payment_id=order_id).update({"payment_id": sale_payment_id}); db.session.commit()
+        qr_code = payment_data['point_of_interaction']['transaction_data']['qr_code']; qr_code_base64 = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
+        return render_template('payment.html', qr_code=qr_code, qr_code_base64=qr_code_base64, sale_payment_id=sale_payment_id)
     except requests.exceptions.RequestException as e:
-        print(f"Erro ao criar pagamento PIX: {e.response.json() if e.response else e}")
-        flash('Não foi possível iniciar o pagamento.', 'error')
-        return redirect(url_for('ver_carrinho'))
+        print(f"Erro ao comunicar com o Mercado Pago: {e}"); flash('Não foi possível iniciar o pagamento PIX.', 'error'); return redirect(url_for('ver_carrinho'))
     
 @app.route('/webhook/pix', methods=['POST'])
 def webhook_mercado_pago():
