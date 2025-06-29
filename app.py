@@ -424,17 +424,13 @@ def payment_failed():
 @app.route('/api/liberar_geladeira/<string:payment_id>')
 def api_liberar_geladeira(payment_id):
     with app.app_context():
-        # Procura por UMA venda associada a este pagamento
         venda_referencia = Sale.query.filter_by(payment_id=payment_id).first()
-
         if not venda_referencia:
             return jsonify({'status': 'error', 'message': 'Compra não encontrada'}), 404
         
-        # Se a compra já foi usada para abrir a porta, recusa.
         if venda_referencia.status == 'completed':
             return jsonify({'status': 'error', 'message': 'Este QR Code já foi utilizado.'}), 403
 
-        # Faz a verificação final e em tempo real com o Mercado Pago
         headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}'}
         try:
             mp_response = requests.get(f'{MERCADO_PAGO_API_URL}/{payment_id}', headers=headers)
@@ -442,33 +438,26 @@ def api_liberar_geladeira(payment_id):
             payment_info = mp_response.json()
 
             if payment_info.get('status') == 'approved':
-                # Se aprovado, faz a baixa de stock e marca como completo
-                vendas_da_ordem = Sale.query.filter_by(payment_id=payment_id, status='pending').all()
-                if vendas_da_ordem:
-                    for venda in vendas_da_ordem:
-                        item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
-                        if item:
-                            item.quantity -= venda.quantity_sold
-                    # Atualiza o status de todas as vendas para 'completed' de uma só vez
-                    Sale.query.filter_by(payment_id=payment_id).update({'status': 'completed'})
-                    db.session.commit()
-                    return jsonify({'status': 'ok', 'message': 'Acesso liberado'})
-                else:
-                    # Se não encontrou vendas pendentes, pode ser que o webhook já tenha atualizado para 'paid'
-                    # Vamos verificar e permitir o acesso, mas marcar como 'completed'
-                    vendas_ja_pagas = Sale.query.filter_by(payment_id=payment_id, status='paid').all()
-                    if vendas_ja_pagas:
-                        Sale.query.filter_by(payment_id=payment_id).update({'status': 'completed'})
-                        db.session.commit()
-                        return jsonify({'status': 'ok', 'message': 'Acesso liberado (confirmado novamente)'})
-                    else:
-                        return jsonify({'status': 'error', 'message': 'Estado da compra inconsistente'}), 500
+                vendas_para_processar = Sale.query.filter_by(payment_id=payment_id).all()
+                if not vendas_para_processar or vendas_para_processar[0].status == 'completed':
+                    return jsonify({'status': 'error', 'message': 'Venda já processada.'}), 409
 
+                for venda in vendas_para_processar:
+                    item = Inventory.query.filter_by(product_id=venda.product_id, condominio_id=venda.condominio_id).first()
+                    if item and item.quantity >= venda.quantity_sold:
+                        item.quantity -= venda.quantity_sold
+                    else:
+                        print(f"ALERTA: Stock insuficiente para o produto {venda.product_id} na venda {venda.id}. Baixa de stock não realizada.")
+                    venda.status = 'completed'
+
+                db.session.commit()
+                return jsonify({'status': 'ok', 'message': 'Acesso liberado'})
             else:
                 return jsonify({'status': 'error', 'message': 'Pagamento não confirmado pelo Mercado Pago.'}), 402
         except Exception as e:
             print(f"Erro crítico na API da geladeira: {e}")
             return jsonify({'status': 'error', 'message': 'Erro interno ao validar pagamento'}), 500
+
 
 
 # --- ROTAS DO PAINEL DO ADMINISTRADOR ---
