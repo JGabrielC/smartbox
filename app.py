@@ -340,10 +340,24 @@ def finalizar_compra_pix():
 
     description = f"{', '.join(description_items)} | {current_user.full_name}"
     
+    # --- DADOS DO PAGADOR (CORRIGIDO E COMPLETO) ---
+    cpf_limpo = ''.join(filter(str.isdigit, current_user.cpf))
+    payer_data = {
+        "email": f"cliente_{current_user.id}@smartbox.com",
+        "first_name": current_user.full_name.split(' ')[0],
+        "last_name": ' '.join(current_user.full_name.split(' ')[1:]),
+        "identification": {
+            "type": "CPF",
+            "number": cpf_limpo
+        }
+    }
+
     headers = {'Authorization': f'Bearer {MERCADO_PAGO_ACCESS_TOKEN}', 'Content-Type': 'application/json'}
     payload = {
-        "transaction_amount": round(total_amount, 2), "description": description,
-        "payment_method_id": "pix", "payer": {"email": f"cliente_{current_user.id}@smartbox.com"},
+        "transaction_amount": round(total_amount, 2),
+        "description": description,
+        "payment_method_id": "pix",
+        "payer": payer_data, # <--- DADOS DO PAGADOR ATUALIZADOS
         "external_reference": order_id
     }
     
@@ -359,7 +373,7 @@ def finalizar_compra_pix():
         qr_code_pix = payment_data['point_of_interaction']['transaction_data']['qr_code_base64']
         return render_template('payment.html', qr_code_pix=qr_code_pix, payment_id=payment_id)
     except requests.exceptions.RequestException as e:
-        print(f"Erro ao criar pagamento PIX: {e}")
+        print(f"Erro ao criar pagamento PIX: {e.response.json() if e.response else e}")
         flash('Não foi possível iniciar o pagamento.', 'error')
         return redirect(url_for('ver_carrinho'))
     
